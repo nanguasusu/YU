@@ -159,6 +159,8 @@ export default function App() {
                 setCountdownStyle={state.setCountdownStyle}
                 accentColor={state.accentColor}
                 setAccentColor={state.setAccentColor}
+                autostart={state.autostart}
+                toggleAutostart={state.toggleAutostart}
                 onSound={(type) => playSound(type, state.isMuted)}
               />
             )}

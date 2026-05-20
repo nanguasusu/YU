@@ -1,4 +1,4 @@
-import { Volume2 } from 'lucide-react';
+import { Volume2, Power } from 'lucide-react';
 import { motion } from 'motion/react';
 import type { CountdownStyle } from '../types';
 
@@ -11,13 +11,15 @@ interface SettingsTabProps {
   setCountdownStyle: (style: CountdownStyle) => void;
   accentColor: string;
   setAccentColor: (color: string) => void;
+  autostart: boolean;
+  toggleAutostart: (enabled: boolean) => void;
   onSound: (type: 'click') => void;
 }
 
 const STYLE_OPTIONS: { value: CountdownStyle; label: string }[] = [
   { value: 'sans', label: '无衬线' },
-  { value: 'serif', label: '衬线' },
-  { value: 'mono', label: '等宽' },
+  { value: 'serif', label: 'Playfair' },
+  { value: 'mono', label: 'Special' },
 ];
 
 export function SettingsTab({
@@ -29,6 +31,8 @@ export function SettingsTab({
   setCountdownStyle,
   accentColor,
   setAccentColor,
+  autostart,
+  toggleAutostart,
   onSound,
 }: SettingsTabProps) {
   return (
@@ -61,6 +65,23 @@ export function SettingsTab({
               aria-label={isMuted ? '关闭静音' : '开启静音'}
             >
               <div className={`toggle-knob ${isMuted ? 'toggle-knob-on' : 'toggle-knob-off'}`} />
+            </button>
+          </div>
+
+          {/* 开机自启动 */}
+          <div className="settings-item">
+            <div className="settings-label">
+              <Power className="settings-icon" />
+              <span className="settings-text">开机自启动</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => { onSound('click'); void toggleAutostart(!autostart); }}
+              className={`toggle-btn ${autostart ? 'toggle-btn-on' : 'toggle-btn-off'}`}
+              aria-pressed={autostart}
+              aria-label={autostart ? '关闭开机自启动' : '开启开机自启动'}
+            >
+              <div className={`toggle-knob ${autostart ? 'toggle-knob-on' : 'toggle-knob-off'}`} />
             </button>
           </div>
 

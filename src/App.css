@@ -367,8 +367,8 @@
 }
 
 .timer-font-sans { font-family: sans-serif; }
-.timer-font-serif { font-family: serif; }
-.timer-font-mono { font-family: monospace; }
+.timer-font-serif { font-family: 'Playfair Display', Georgia, serif; }
+.timer-font-mono { font-family: 'Special Elite', 'Courier New', cursive; }
 
 .timer-number {
   letter-spacing: -0.5px;

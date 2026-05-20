@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Countdown Widget",
+  "productName": "屿",
   "version": "0.1.0",
   "identifier": "com.yu.countdownwidget",
   "build": {
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Countdown Widget",
+        "title": "屿",
         "width": 320,
         "height": 560,
         "minWidth": 260,
@@ -23,7 +23,7 @@
         "maximizable": false,
         "skipTaskbar": true,
         "fullscreen": false,
-        "center": true,
+        "center": false,
         "decorations": false,
         "transparent": true,
         "shadow": false
@@ -48,6 +48,13 @@
         "installMode": "currentUser",
         "languages": ["SimpChinese"],
         "displayLanguageSelector": false
+      },
+      "wix": {
+        "language": {
+          "zh-CN": {
+            "localePath": "wix/zh-CN.wxl"
+          }
+        }
       }
     }
   }
