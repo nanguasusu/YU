@@ -78,9 +78,6 @@ export default function App() {
         >
           {isMinimized ? (
             <>
-              <div className="mini-side-slot mini-side-left" onMouseDown={handleWindowDragMouseDown}>
-                <BrandClockIcon accentColor={state.accentColor} size={32} className="mini-brand-icon" />
-              </div>
               <div className="top-bar-drag-zone mini-drag-zone" onMouseDown={handleWindowDragMouseDown}>
                 <div className="mini-info mini-info-visible">
                   <span

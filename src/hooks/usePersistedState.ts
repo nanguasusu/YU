@@ -43,7 +43,7 @@ export function usePersistedState() {
             const size = await win.innerSize();
             const factor = await win.scaleFactor();
             const logicalW = Math.round(size.width / factor);
-            setWidgetWidth(Math.min(640, Math.max(320, logicalW)));
+            setWidgetWidth(Math.min(480, Math.max(260, logicalW)));
           } catch { /* ignore */ }
         });
       } catch { /* non-Tauri env */ }

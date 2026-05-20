@@ -65,7 +65,7 @@ export const DEFAULT_STATE: PersistedState = {
   countdownStyle: 'sans',
   muted: false,
   opacity: DEFAULT_OPACITY,
-  widgetWidth: 420,
+  widgetWidth: 320,
   tasks: defaultTasks,
   progressItems: defaultProgressItems,
   accentColor: DEFAULT_ACCENT,

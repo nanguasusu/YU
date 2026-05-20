@@ -33,7 +33,7 @@ export const loadPersistedState = (): PersistedState => {
       countdownStyle: parsed.countdownStyle || 'sans',
       muted: parsed.muted ?? parsed.notifications ?? false,
       opacity: Math.min(100, Math.max(20, Number(parsed.opacity) || DEFAULT_OPACITY)),
-      widgetWidth: Math.min(640, Math.max(320, Number(parsed.widgetWidth) || 420)),
+      widgetWidth: Math.min(480, Math.max(260, Number(parsed.widgetWidth) || 320)),
       tasks:
         Array.isArray(parsed.tasks) && parsed.tasks.length > 0
           ? parsed.tasks
