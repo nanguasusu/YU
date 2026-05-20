@@ -1,20 +1,41 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# YU — 倒计时桌面小组件
 
-# Run and deploy your AI Studio app
+一个基于 Tauri + React 构建的轻量桌面倒计时工具，支持多任务管理、统计记录和自定义设置。
 
-This contains everything you need to run your app locally.
+## 功能特性
 
-View your app in AI Studio: https://ai.studio/apps/092c36ba-af62-48b5-835d-4b9e75ef2315
+- **倒计时 / 正计时** — 灵活切换计时模式
+- **任务管理** — 创建、编辑、删除多个计时任务
+- **数据统计** — 记录历史完成情况
+- **自定义设置** — 调整提示音、主题等偏好
+- **本地持久化** — 数据保存在本地，无需联网
 
-## Run Locally
+## 技术栈
 
-**Prerequisites:**  Node.js
+- [Tauri v2](https://tauri.app/) — 跨平台桌面框架
+- [React 19](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/)
+- [Tailwind CSS v4](https://tailwindcss.com/)
+- [Vite](https://vitejs.dev/)
 
+## 本地运行
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+**前置要求：** Node.js、Rust
+
+```bash
+# 安装依赖
+npm install
+
+# 启动 Web 开发模式
+npm run dev
+
+# 启动 Tauri 桌面开发模式
+npm run tauri:dev
+```
+
+## 构建打包
+
+```bash
+npm run tauri:build
+```
+
+构建产物在 `src-tauri/target/release/bundle/` 目录下。
