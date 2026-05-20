@@ -1,4 +1,5 @@
 export const STORAGE_KEY = 'countdown-task-widget-state';
+export const STORE_FILE = 'app-state.json';
 
 export const PROGRESS_COLORS = ['color-0', 'color-1', 'color-2', 'color-3', 'color-4'] as const;
 

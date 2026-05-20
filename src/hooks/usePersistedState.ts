@@ -1,25 +1,57 @@
 import { useEffect, useState } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { loadPersistedState, savePersistedState } from '../lib/storage';
-import { buildDateFromInput, formatDateInput, PROGRESS_COLORS } from '../types';
+import { buildDateFromInput, formatDateInput, PROGRESS_COLORS, DEFAULT_STATE } from '../types';
 import type { CountdownStyle, TaskItem, ProgressItem } from '../types';
 
 export function usePersistedState() {
-  const persisted = loadPersistedState();
+  const [targetTitle, setTargetTitle] = useState(DEFAULT_STATE.targetTitle);
+  const [targetDate, setTargetDate] = useState(buildDateFromInput(DEFAULT_STATE.targetDate));
+  const [countdownStyle, setCountdownStyle] = useState<CountdownStyle>(DEFAULT_STATE.countdownStyle);
+  const [widgetOpacity, setWidgetOpacity] = useState(DEFAULT_STATE.opacity);
+  const [widgetWidth, setWidgetWidth] = useState(DEFAULT_STATE.widgetWidth);
+  const [tasks, setTasks] = useState<TaskItem[]>(DEFAULT_STATE.tasks);
+  const [progressItems, setProgressItems] = useState<ProgressItem[]>(DEFAULT_STATE.progressItems);
+  const [isMuted, setIsMuted] = useState(DEFAULT_STATE.muted);
+  const [accentColor, setAccentColor] = useState<string>(DEFAULT_STATE.accentColor);
+  const [autostart, setAutostartState] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
 
-  const [targetTitle, setTargetTitle] = useState(persisted.targetTitle);
-  const [targetDate, setTargetDate] = useState(buildDateFromInput(persisted.targetDate));
-  const [countdownStyle, setCountdownStyle] = useState<CountdownStyle>(persisted.countdownStyle);
-  const [widgetOpacity, setWidgetOpacity] = useState(persisted.opacity);
-  const [widgetWidth, setWidgetWidth] = useState(persisted.widgetWidth);
-  const [tasks, setTasks] = useState<TaskItem[]>(persisted.tasks);
-  const [progressItems, setProgressItems] = useState<ProgressItem[]>(persisted.progressItems);
-  const [isMuted, setIsMuted] = useState(persisted.muted);
-  const [accentColor, setAccentColor] = useState<string>(persisted.accentColor);
+  useEffect(() => {
+    const load = async () => {
+      const persisted = await loadPersistedState();
+      setTargetTitle(persisted.targetTitle);
+      setTargetDate(buildDateFromInput(persisted.targetDate));
+      setCountdownStyle(persisted.countdownStyle);
+      setWidgetOpacity(persisted.opacity);
+      setWidgetWidth(persisted.widgetWidth);
+      setTasks(persisted.tasks);
+      setProgressItems(persisted.progressItems);
+      setIsMuted(persisted.muted);
+      setAccentColor(persisted.accentColor);
+      setIsHydrated(true);
+    };
+
+    void load();
+  }, []);
+
+  // Load autostart state on mount
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        const enabled = await invoke<boolean>('get_autostart');
+        setAutostartState(enabled);
+      } catch { /* non-Tauri */ }
+    };
+    void load();
+  }, []);
 
   // Persist state on every change
   useEffect(() => {
-    savePersistedState({
+    if (!isHydrated) return;
+
+    void savePersistedState({
       targetTitle,
       targetDate: formatDateInput(targetDate),
       countdownStyle,
@@ -30,7 +62,7 @@ export function usePersistedState() {
       progressItems,
       accentColor,
     });
-  }, [countdownStyle, isMuted, progressItems, targetDate, targetTitle, tasks, widgetOpacity, accentColor, widgetWidth]);
+  }, [accentColor, countdownStyle, isHydrated, isMuted, progressItems, targetDate, targetTitle, tasks, widgetOpacity, widgetWidth]);
 
   // Listen to Tauri window resize and persist the new width
   useEffect(() => {
@@ -135,6 +167,16 @@ export function usePersistedState() {
     setTasks((currentTasks) => currentTasks.filter((task) => !task.completed));
   };
 
+  // ── Autostart ─────────────────────────────────────────────────────────────
+
+  const toggleAutostart = async (enabled: boolean) => {
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      await invoke('set_autostart', { enabled });
+      setAutostartState(enabled);
+    } catch { /* non-Tauri */ }
+  };
+
   return {
     // state
     targetTitle, setTargetTitle,
@@ -146,6 +188,7 @@ export function usePersistedState() {
     progressItems,
     isMuted, setIsMuted,
     accentColor, setAccentColor,
+    autostart, toggleAutostart,
     // task actions
     toggleTask, deleteTask, addTask, clearCompletedTasks,
     // progress actions
