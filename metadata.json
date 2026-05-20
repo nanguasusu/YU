@@ -1,0 +1,8 @@
+{
+  "name": "Countdown & Task Widget",
+  "description": "A glassmorphism-styled widget containing a countdown timer and a daily task list.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

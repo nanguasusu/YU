@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Countdown Widget icon">
+  <defs>
+    <radialGradient id="mist" cx="48%" cy="46%" r="62%">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.95"/>
+      <stop offset="0.58" stop-color="#EAF8F1" stop-opacity="0.88"/>
+      <stop offset="1" stop-color="#DFF3EA" stop-opacity="0.78"/>
+    </radialGradient>
+    <linearGradient id="green" x1="234" y1="214" x2="824" y2="812" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#BCEED8" stop-opacity="0.52"/>
+      <stop offset="0.48" stop-color="#5BE0A1"/>
+      <stop offset="1" stop-color="#28C978"/>
+    </linearGradient>
+    <linearGradient id="softLine" x1="188" y1="142" x2="824" y2="864" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.92"/>
+      <stop offset="1" stop-color="#E8F6F0" stop-opacity="0.66"/>
+    </linearGradient>
+    <filter id="blurShadow" x="32" y="24" width="960" height="976" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="28" stdDeviation="40" flood-color="#8BCDB1" flood-opacity="0.26"/>
+    </filter>
+    <filter id="glow" x="144" y="140" width="736" height="720" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="12" stdDeviation="20" flood-color="#50D691" flood-opacity="0.22"/>
+    </filter>
+  </defs>
+
+  <rect width="1024" height="1024" fill="none"/>
+  <g filter="url(#blurShadow)">
+    <rect x="108" y="92" width="808" height="840" rx="212" fill="url(#mist)"/>
+    <rect x="136" y="120" width="752" height="784" rx="184" fill="none" stroke="url(#softLine)" stroke-width="20"/>
+  </g>
+
+  <g filter="url(#glow)" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M408 274A330 330 0 1 0 742 780" stroke="#8DE6BC" stroke-width="52" opacity="0.46"/>
+    <path d="M588 264A330 330 0 0 1 812 642" stroke="url(#green)" stroke-width="52"/>
+    <circle cx="512" cy="500" r="170" stroke="#53D993" stroke-width="12"/>
+    <path d="M512 392V512L586 536" stroke="#53D993" stroke-width="24"/>
+  </g>
+
+  <g filter="url(#blurShadow)">
+    <circle cx="730" cy="690" r="126" fill="url(#mist)" stroke="#FFFFFF" stroke-width="14"/>
+    <path d="M672 696L720 744L792 660" fill="none" stroke="#50D691" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>
