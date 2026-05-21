@@ -12,16 +12,13 @@ export default function SettingsWindow() {
   const state = usePersistedState({ trackWindowWidth: false, persistMode: 'settings' });
   const isTauriWindow = '__TAURI_INTERNALS__' in window;
 
-  const hideWindow = async () => {
+  const closeSettingsWindow = async () => {
     playSound('click', state.isMuted);
+    if (!isTauriWindow) return; // browser preview — no IPC available
     try {
-      await getCurrentWindow().hide();
-    } catch {
-      try {
-        await getCurrentWindow().close();
-      } catch {
-        // non-Tauri preview
-      }
+      await getCurrentWindow().close();
+    } catch (err) {
+      console.error('[settings] close failed', err);
     }
   };
 
@@ -63,7 +60,7 @@ export default function SettingsWindow() {
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
-              void hideWindow();
+              void closeSettingsWindow();
             }}
             aria-label="关闭设置窗口"
           >
