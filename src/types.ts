@@ -20,8 +20,9 @@ export const getDefaultTargetDate = (): string => {
 };
 
 export type CountdownStyle = 'sans' | 'serif' | 'mono';
-export type ActiveTab = 'timer' | 'tasks' | 'stats' | 'settings';
+export type ActiveTab = 'timer' | 'tasks' | 'stats';
 export type SoundType = 'click' | 'complete' | 'minimize' | 'unminimize' | 'pop';
+export type TimerStatus = 'idle' | 'running' | 'paused';
 
 export type TaskItem = {
   id: number;
@@ -48,6 +49,10 @@ export type PersistedState = {
   tasks: TaskItem[];
   progressItems: ProgressItem[];
   accentColor: string;
+  activityTag: string;
+  timerStatus: TimerStatus;
+  elapsedMs: number;
+  lastStartedAt: number | null;
 };
 
 export const defaultTasks: TaskItem[] = [
@@ -70,6 +75,10 @@ export const DEFAULT_STATE: PersistedState = {
   tasks: defaultTasks,
   progressItems: defaultProgressItems,
   accentColor: DEFAULT_ACCENT,
+  activityTag: '',
+  timerStatus: 'idle',
+  elapsedMs: 0,
+  lastStartedAt: null,
 };
 
 export const buildDateFromInput = (value: string) => new Date(`${value}T00:00:00`);
@@ -85,4 +94,15 @@ export const getProgressTone = (percent: number) => {
   if (percent >= 50) return 'progress-tone-mid';
   if (percent >= 25) return 'progress-tone-low';
   return 'progress-tone-start';
+};
+
+export const ACTIVITY_TAG_OPTIONS = ['Coding', '学习', '阅读', '休息'] as const;
+
+export const formatElapsedTime = (elapsedMs: number): string => {
+  const totalSeconds = Math.max(0, Math.floor(elapsedMs / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  return [hours, minutes, seconds].map((part) => String(part).padStart(2, '0')).join(':');
 };

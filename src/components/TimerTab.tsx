@@ -25,22 +25,27 @@ export function TimerTab({
   const [isEditingTarget, setIsEditingTarget] = useState(false);
   const [tempTarget, setTempTarget] = useState(formatDateInput(targetDate));
   const [dateError, setDateError] = useState('');
-  // Own clock — only re-renders when the day count changes (at midnight).
-  // No need for a 1-second interval in expanded mode since we only show days.
   const [now, setNow] = useState(new Date());
   const tickHandleRef = useRef<ReturnType<typeof setTimeout> | ReturnType<typeof setInterval> | null>(null);
+
   useEffect(() => {
     const scheduleNextMidnight = () => {
-      const n = new Date();
+      const current = new Date();
       const msUntilMidnight =
-        new Date(n.getFullYear(), n.getMonth(), n.getDate() + 1).getTime() - n.getTime();
+        new Date(
+          current.getFullYear(),
+          current.getMonth(),
+          current.getDate() + 1,
+        ).getTime() - current.getTime();
+
       tickHandleRef.current = setTimeout(() => {
         setNow(new Date());
-        // After first midnight hit, tick every 24 h
         tickHandleRef.current = setInterval(() => setNow(new Date()), 24 * 60 * 60 * 1000);
       }, msUntilMidnight);
     };
+
     scheduleNextMidnight();
+
     return () => {
       if (tickHandleRef.current !== null) {
         clearTimeout(tickHandleRef.current as ReturnType<typeof setTimeout>);
@@ -50,7 +55,7 @@ export function TimerTab({
   }, []);
 
   const diff = Math.max(0, targetDate.getTime() - now.getTime());
-  const d = Math.ceil(diff / (1000 * 60 * 60 * 24));
+  const daysLeft = Math.ceil(diff / (1000 * 60 * 60 * 24));
   const hasOverdueTarget = targetDate.getTime() < now.getTime();
 
   const saveTargetDate = () => {
@@ -59,6 +64,7 @@ export function TimerTab({
       setDateError('请输入有效日期');
       return;
     }
+
     setTargetDate(nextDate);
     setDateError('');
     setIsEditingTarget(false);
@@ -138,7 +144,7 @@ export function TimerTab({
             className={`timer-number timer-number-${countdownStyle}`}
             style={{ color: accentColor }}
           >
-            {d}
+            {daysLeft}
           </span>
           <span className="timer-label">天</span>
         </div>
@@ -155,7 +161,9 @@ export function TimerTab({
                     setTempTarget(e.target.value);
                     if (dateError) setDateError('');
                   }}
-                  onBlur={() => { if (!dateError) saveTargetDate(); }}
+                  onBlur={() => {
+                    if (!dateError) saveTargetDate();
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') saveTargetDate();
                     if (e.key === 'Escape') cancelTargetEdit();

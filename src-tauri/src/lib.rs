@@ -3,8 +3,12 @@ use tauri::Manager;
 use tauri_plugin_store::StoreExt;
 
 const STORE_FILE: &str = "app-state.json";
-const WINDOW_BOUNDS_KEY: &str = "window-bounds";
-const WINDOW_POSITION_KEY: &str = "window-position";
+const MAIN_WINDOW_LABEL: &str = "main";
+const SETTINGS_WINDOW_LABEL: &str = "settings";
+const MAIN_WINDOW_BOUNDS_KEY: &str = "window-bounds";
+const MAIN_WINDOW_POSITION_KEY: &str = "window-position";
+const SETTINGS_WINDOW_BOUNDS_KEY: &str = "settings-window-bounds";
+const SETTINGS_WINDOW_POSITION_KEY: &str = "settings-window-position";
 
 #[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
 struct WindowBounds {
@@ -43,10 +47,26 @@ fn clamp_bounds_to_monitor(bounds: WindowBounds, monitor: &tauri::Monitor) -> Wi
   }
 }
 
-fn write_window_bounds<R: tauri::Runtime>(app: &tauri::AppHandle<R>, bounds: WindowBounds) {
+fn managed_window_storage_keys(label: &str) -> Option<(&'static str, &'static str)> {
+  match label {
+    MAIN_WINDOW_LABEL => Some((MAIN_WINDOW_BOUNDS_KEY, MAIN_WINDOW_POSITION_KEY)),
+    SETTINGS_WINDOW_LABEL => Some((SETTINGS_WINDOW_BOUNDS_KEY, SETTINGS_WINDOW_POSITION_KEY)),
+    _ => None,
+  }
+}
+
+fn write_window_bounds<R: tauri::Runtime>(
+  app: &tauri::AppHandle<R>,
+  label: &str,
+  bounds: WindowBounds,
+) {
+  let Some((bounds_key, position_key)) = managed_window_storage_keys(label) else {
+    return;
+  };
+
   if let Ok(store) = app.store(STORE_FILE) {
-    store.set(WINDOW_BOUNDS_KEY, serde_json::json!(bounds));
-    store.delete(WINDOW_POSITION_KEY);
+    store.set(bounds_key, serde_json::json!(bounds));
+    store.delete(position_key);
     let _ = store.save();
   }
 }
@@ -55,6 +75,7 @@ fn save_window_bounds<R: tauri::Runtime>(app: &tauri::AppHandle<R>, window: &tau
   if let (Ok(position), Ok(size)) = (window.outer_position(), window.outer_size()) {
     write_window_bounds(
       app,
+      window.label(),
       WindowBounds {
         x: position.x,
         y: position.y,
@@ -72,6 +93,7 @@ fn save_webview_window_bounds<R: tauri::Runtime>(
   if let (Ok(position), Ok(size)) = (window.outer_position(), window.outer_size()) {
     write_window_bounds(
       app,
+      window.label(),
       WindowBounds {
         x: position.x,
         y: position.y,
@@ -82,18 +104,22 @@ fn save_webview_window_bounds<R: tauri::Runtime>(
   }
 }
 
-fn load_window_bounds<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Option<WindowBounds> {
+fn load_window_bounds_for_label<R: tauri::Runtime>(
+  app: &tauri::AppHandle<R>,
+  label: &str,
+) -> Option<WindowBounds> {
+  let (bounds_key, position_key) = managed_window_storage_keys(label)?;
   let Ok(store) = app.store(STORE_FILE) else {
     return None;
   };
 
-  if let Some(saved) = store.get(WINDOW_BOUNDS_KEY) {
+  if let Some(saved) = store.get(bounds_key) {
     if let Ok(bounds) = serde_json::from_value::<WindowBounds>(saved) {
       return Some(bounds);
     }
   }
 
-  let saved = store.get(WINDOW_POSITION_KEY)?;
+  let saved = store.get(position_key)?;
   let Ok(position) = serde_json::from_value::<serde_json::Value>(saved) else {
     return None;
   };
@@ -101,8 +127,8 @@ fn load_window_bounds<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Option<Wi
   Some(WindowBounds {
     x: position.get("x")?.as_i64()? as i32,
     y: position.get("y")?.as_i64()? as i32,
-    width: 320,
-    height: 560,
+    width: if label == SETTINGS_WINDOW_LABEL { 360 } else { 320 },
+    height: if label == SETTINGS_WINDOW_LABEL { 460 } else { 560 },
   })
 }
 
@@ -110,7 +136,7 @@ fn restore_window_bounds<R: tauri::Runtime>(
   app: &tauri::AppHandle<R>,
   window: &tauri::WebviewWindow<R>,
 ) {
-  let Some(saved_bounds) = load_window_bounds(app) else {
+  let Some(saved_bounds) = load_window_bounds_for_label(app, window.label()) else {
     return;
   };
 
@@ -139,16 +165,44 @@ fn restore_window_bounds<R: tauri::Runtime>(
     || bounds.width != saved_bounds.width
     || bounds.height != saved_bounds.height
   {
-    write_window_bounds(app, bounds);
+    write_window_bounds(app, window.label(), bounds);
   }
 }
 
-fn save_if_main_window<R: tauri::Runtime>(window: &tauri::Window<R>) {
-  if window.label() != "main" {
+fn save_if_managed_window<R: tauri::Runtime>(window: &tauri::Window<R>) {
+  if managed_window_storage_keys(window.label()).is_none() {
     return;
   }
 
   save_window_bounds(&window.app_handle(), window);
+}
+
+#[cfg(desktop)]
+fn create_settings_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()> {
+  if app.get_webview_window(SETTINGS_WINDOW_LABEL).is_some() {
+    return Ok(());
+  }
+
+  let window = tauri::WebviewWindowBuilder::new(
+    app,
+    SETTINGS_WINDOW_LABEL,
+    tauri::WebviewUrl::App("index.html".into()),
+  )
+  .title("屿设置")
+  .inner_size(360.0, 460.0)
+  .min_inner_size(320.0, 400.0)
+  .max_inner_size(420.0, 560.0)
+  .resizable(false)
+  .skip_taskbar(true)
+  .visible(false)
+  .decorations(false)
+  .transparent(true)
+  .shadow(false)
+  .build()?;
+
+  restore_window_bounds(app, &window);
+  let _ = window.set_skip_taskbar(true);
+  Ok(())
 }
 
 #[tauri::command]
@@ -302,14 +356,15 @@ pub fn run() {
           tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
         };
 
-        if let Some(window) = app.get_webview_window("main") {
+        if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
           restore_window_bounds(app.handle(), &window);
         }
 
-        let show = MenuItem::with_id(app, "show", "显示窗口", true, None::<&str>)?;
+        let show = MenuItem::with_id(app, "show", "显示组件", true, None::<&str>)?;
+        let settings = MenuItem::with_id(app, "settings", "打开设置", true, None::<&str>)?;
         let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
         let separator = PredefinedMenuItem::separator(app)?;
-        let menu = Menu::with_items(app, &[&show, &separator, &quit])?;
+        let menu = Menu::with_items(app, &[&show, &settings, &separator, &quit])?;
         let icon = app.default_window_icon().cloned().unwrap();
 
         TrayIconBuilder::with_id("main-tray")
@@ -319,8 +374,12 @@ pub fn run() {
           .show_menu_on_left_click(false)
           .on_menu_event(|app, event| match event.id().as_ref() {
             "show" => show_main_window(app),
+            "settings" => show_settings_window(app),
             "quit" => {
-              if let Some(window) = app.get_webview_window("main") {
+              if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
+                save_webview_window_bounds(app, &window);
+              }
+              if let Some(window) = app.get_webview_window(SETTINGS_WINDOW_LABEL) {
                 save_webview_window_bounds(app, &window);
               }
               app.exit(0);
@@ -339,7 +398,7 @@ pub fn run() {
           })
           .build(app)?;
 
-        if let Some(window) = app.get_webview_window("main") {
+        if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
           let _ = window.set_skip_taskbar(true);
         }
       }
@@ -348,23 +407,42 @@ pub fn run() {
     })
     .on_window_event(|window, event| {
       match event {
-        tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_) => save_if_main_window(window),
+        tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_) => save_if_managed_window(window),
         tauri::WindowEvent::CloseRequested { api, .. } => {
-          api.prevent_close();
-          save_if_main_window(window);
-          let _ = window.hide();
+          save_if_managed_window(window);
+          if window.label() == MAIN_WINDOW_LABEL {
+            api.prevent_close();
+            let _ = window.hide();
+          }
         }
         _ => {}
       }
     })
-    .invoke_handler(tauri::generate_handler![get_autostart, set_autostart, trim_memory])
+    .invoke_handler(tauri::generate_handler![
+      get_autostart,
+      set_autostart,
+      trim_memory
+    ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
 }
 
 #[cfg(desktop)]
 fn show_main_window(app: &tauri::AppHandle) {
-  if let Some(window) = app.get_webview_window("main") {
+  if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
+    let _ = window.show();
+    let _ = window.set_focus();
+    let _ = window.set_skip_taskbar(true);
+  }
+}
+
+#[cfg(desktop)]
+fn show_settings_window(app: &tauri::AppHandle) {
+  if app.get_webview_window(SETTINGS_WINDOW_LABEL).is_none() {
+    let _ = create_settings_window(app);
+  }
+
+  if let Some(window) = app.get_webview_window(SETTINGS_WINDOW_LABEL) {
     let _ = window.show();
     let _ = window.set_focus();
     let _ = window.set_skip_taskbar(true);
