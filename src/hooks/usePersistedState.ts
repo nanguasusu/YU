@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { loadPersistedState, savePersistedState } from '../lib/storage';
 import { buildDateFromInput, formatDateInput, PROGRESS_COLORS, DEFAULT_STATE } from '../types';
@@ -16,6 +16,8 @@ export function usePersistedState() {
   const [accentColor, setAccentColor] = useState<string>(DEFAULT_STATE.accentColor);
   const [autostart, setAutostartState] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
+  // Debounce timer ref for persisting state
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -47,21 +49,28 @@ export function usePersistedState() {
     void load();
   }, []);
 
-  // Persist state on every change
+  // Persist state on every change — debounced 500 ms to avoid hammering disk
   useEffect(() => {
     if (!isHydrated) return;
 
-    void savePersistedState({
-      targetTitle,
-      targetDate: formatDateInput(targetDate),
-      countdownStyle,
-      muted: isMuted,
-      opacity: widgetOpacity,
-      widgetWidth,
-      tasks,
-      progressItems,
-      accentColor,
-    });
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      void savePersistedState({
+        targetTitle,
+        targetDate: formatDateInput(targetDate),
+        countdownStyle,
+        muted: isMuted,
+        opacity: widgetOpacity,
+        widgetWidth,
+        tasks,
+        progressItems,
+        accentColor,
+      });
+    }, 500);
+
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
   }, [accentColor, countdownStyle, isHydrated, isMuted, progressItems, targetDate, targetTitle, tasks, widgetOpacity, widgetWidth]);
 
   // Listen to Tauri window resize and persist the new width

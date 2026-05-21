@@ -168,6 +168,119 @@ fn set_autostart(app: tauri::AppHandle, enabled: bool) {
   }
 }
 
+/// Release the process working set so Windows can page unused memory to disk.
+/// Called when the widget has been idle (mouse away) for a while.
+#[tauri::command]
+fn trim_memory() {
+  #[cfg(target_os = "windows")]
+  unsafe {
+    use std::collections::HashSet;
+    use std::mem::size_of;
+
+    type Handle = *mut std::ffi::c_void;
+    type Bool = i32;
+
+    const TH32CS_SNAPPROCESS: u32 = 0x00000002;
+    const PROCESS_QUERY_INFORMATION: u32 = 0x0400;
+    const PROCESS_SET_QUOTA: u32 = 0x0100;
+    const INVALID_HANDLE_VALUE: Handle = -1isize as Handle;
+
+    #[allow(non_snake_case)]
+    #[repr(C)]
+    struct ProcessEntry32W {
+      dwSize: u32,
+      cntUsage: u32,
+      th32ProcessID: u32,
+      th32DefaultHeapID: usize,
+      th32ModuleID: u32,
+      cntThreads: u32,
+      th32ParentProcessID: u32,
+      pcPriClassBase: i32,
+      dwFlags: u32,
+      szExeFile: [u16; 260],
+    }
+
+    unsafe extern "system" {
+      fn GetCurrentProcess() -> Handle;
+      fn GetCurrentProcessId() -> u32;
+      fn OpenProcess(dw_desired_access: u32, b_inherit_handle: Bool, dw_process_id: u32) -> Handle;
+      fn CloseHandle(h_object: Handle) -> Bool;
+      fn CreateToolhelp32Snapshot(dw_flags: u32, th32_process_id: u32) -> Handle;
+      fn Process32FirstW(h_snapshot: Handle, lppe: *mut ProcessEntry32W) -> Bool;
+      fn Process32NextW(h_snapshot: Handle, lppe: *mut ProcessEntry32W) -> Bool;
+      fn SetProcessWorkingSetSize(
+        h_process: Handle,
+        dw_minimum_working_set_size: usize,
+        dw_maximum_working_set_size: usize,
+      ) -> Bool;
+    }
+
+    unsafe fn trim_process(handle: Handle) -> bool {
+      SetProcessWorkingSetSize(handle, usize::MAX, usize::MAX) != 0
+    }
+
+    let current_pid = GetCurrentProcessId();
+    let mut processes = Vec::new();
+    let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+
+    if snapshot != INVALID_HANDLE_VALUE {
+      let mut entry = ProcessEntry32W {
+        dwSize: size_of::<ProcessEntry32W>() as u32,
+        cntUsage: 0,
+        th32ProcessID: 0,
+        th32DefaultHeapID: 0,
+        th32ModuleID: 0,
+        cntThreads: 0,
+        th32ParentProcessID: 0,
+        pcPriClassBase: 0,
+        dwFlags: 0,
+        szExeFile: [0; 260],
+      };
+
+      if Process32FirstW(snapshot, &mut entry) != 0 {
+        loop {
+          processes.push((entry.th32ProcessID, entry.th32ParentProcessID));
+          if Process32NextW(snapshot, &mut entry) == 0 {
+            break;
+          }
+        }
+      }
+
+      CloseHandle(snapshot);
+    }
+
+    let mut target_pids = vec![current_pid];
+    let mut seen = HashSet::from([current_pid]);
+    let mut index = 0;
+
+    while index < target_pids.len() {
+      let parent_pid = target_pids[index];
+      for (pid, process_parent_pid) in &processes {
+        if *process_parent_pid == parent_pid && seen.insert(*pid) {
+          target_pids.push(*pid);
+        }
+      }
+      index += 1;
+    }
+
+    let mut trimmed = usize::from(trim_process(GetCurrentProcess()));
+
+    for pid in target_pids.into_iter().filter(|pid| *pid != current_pid) {
+      let handle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_SET_QUOTA, 0, pid);
+      if handle.is_null() {
+        continue;
+      }
+
+      if trim_process(handle) {
+        trimmed += 1;
+      }
+      CloseHandle(handle);
+    }
+
+    log::info!("[trim_memory] trimmed {} process working sets", trimmed);
+  }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
@@ -244,7 +357,7 @@ pub fn run() {
         _ => {}
       }
     })
-    .invoke_handler(tauri::generate_handler![get_autostart, set_autostart])
+    .invoke_handler(tauri::generate_handler![get_autostart, set_autostart, trim_memory])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
 }

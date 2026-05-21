@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Clock } from 'lucide-react';
 import { motion } from 'motion/react';
 import { buildDateFromInput, formatDateInput, DEFAULT_TARGET_TITLE } from '../types';
@@ -11,7 +11,6 @@ interface TimerTabProps {
   setTargetDate: (date: Date) => void;
   countdownStyle: CountdownStyle;
   accentColor: string;
-  now: Date;
 }
 
 export function TimerTab({
@@ -21,12 +20,34 @@ export function TimerTab({
   setTargetDate,
   countdownStyle,
   accentColor,
-  now,
 }: TimerTabProps) {
   const [isEditingTargetTitle, setIsEditingTargetTitle] = useState(false);
   const [isEditingTarget, setIsEditingTarget] = useState(false);
   const [tempTarget, setTempTarget] = useState(formatDateInput(targetDate));
   const [dateError, setDateError] = useState('');
+  // Own clock — only re-renders when the day count changes (at midnight).
+  // No need for a 1-second interval in expanded mode since we only show days.
+  const [now, setNow] = useState(new Date());
+  const tickHandleRef = useRef<ReturnType<typeof setTimeout> | ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => {
+    const scheduleNextMidnight = () => {
+      const n = new Date();
+      const msUntilMidnight =
+        new Date(n.getFullYear(), n.getMonth(), n.getDate() + 1).getTime() - n.getTime();
+      tickHandleRef.current = setTimeout(() => {
+        setNow(new Date());
+        // After first midnight hit, tick every 24 h
+        tickHandleRef.current = setInterval(() => setNow(new Date()), 24 * 60 * 60 * 1000);
+      }, msUntilMidnight);
+    };
+    scheduleNextMidnight();
+    return () => {
+      if (tickHandleRef.current !== null) {
+        clearTimeout(tickHandleRef.current as ReturnType<typeof setTimeout>);
+        clearInterval(tickHandleRef.current as ReturnType<typeof setInterval>);
+      }
+    };
+  }, []);
 
   const diff = Math.max(0, targetDate.getTime() - now.getTime());
   const d = Math.ceil(diff / (1000 * 60 * 60 * 24));

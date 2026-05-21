@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Clock, CheckSquare, BarChart2, Settings, Minimize2 } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -13,21 +13,56 @@ import { SettingsTab } from './components/SettingsTab';
 import type { ActiveTab } from './types';
 import './App.css';
 
+/** Mini clock shown only when the widget is minimized */
+function MiniClock({ accentColor, title }: { accentColor: string; title: string }) {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const text = [now.getHours(), now.getMinutes(), now.getSeconds()]
+    .map((p) => String(p).padStart(2, '0'))
+    .join(':');
+
+  return (
+    <span
+      className="mini-info-text mini-time-text"
+      title={`${title} · ${text}`}
+      style={{ color: accentColor }}
+    >
+      {text}
+    </span>
+  );
+}
+
 export default function App() {
   const state = usePersistedState();
   const [isMinimized, setIsMinimized] = useState(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>('timer');
-  const [now, setNow] = useState(new Date());
 
-  // Clock tick
-  useEffect(() => {
-    const interval = window.setInterval(() => setNow(new Date()), 1000);
-    return () => window.clearInterval(interval);
+  // ── Memory optimization: trim working set after 30s of mouse-away ─────────
+  const trimTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleMouseLeave = useCallback(() => {
+    trimTimerRef.current = setTimeout(async () => {
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        console.log('[trim_memory] invoking...');
+        await invoke('trim_memory');
+        console.log('[trim_memory] done');
+      } catch (e) {
+        console.error('[trim_memory] error', e);
+      }
+    }, 30_000);
   }, []);
 
-  const miniClockText = [now.getHours(), now.getMinutes(), now.getSeconds()]
-    .map((p) => String(p).padStart(2, '0'))
-    .join(':');
+  const handleMouseEnter = useCallback(() => {
+    if (trimTimerRef.current) {
+      clearTimeout(trimTimerRef.current);
+      trimTimerRef.current = null;
+    }
+  }, []);
 
   const changeTab = (tab: ActiveTab) => {
     if (activeTab === tab) return;
@@ -62,6 +97,8 @@ export default function App() {
           backgroundColor: `rgba(255, 255, 255, ${state.widgetOpacity / 100})`,
           maxWidth: state.widgetWidth,
         }}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
       >
         {/* Right-edge resize handle */}
         <div
@@ -80,13 +117,7 @@ export default function App() {
             <>
               <div className="top-bar-drag-zone mini-drag-zone" onMouseDown={handleWindowDragMouseDown}>
                 <div className="mini-info mini-info-visible">
-                  <span
-                    className="mini-info-text mini-time-text"
-                    title={`${state.targetTitle} · ${miniClockText}`}
-                    style={{ color: state.accentColor }}
-                  >
-                    {miniClockText}
-                  </span>
+                  <MiniClock accentColor={state.accentColor} title={state.targetTitle} />
                 </div>
               </div>
             </>
@@ -123,7 +154,6 @@ export default function App() {
                 setTargetDate={state.setTargetDate}
                 countdownStyle={state.countdownStyle}
                 accentColor={state.accentColor}
-                now={now}
               />
             )}
             {activeTab === 'tasks' && (

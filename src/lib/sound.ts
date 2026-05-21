@@ -1,15 +1,34 @@
 import type { SoundType } from '../types';
 
-export const playSound = (type: SoundType, muted = false): void => {
-  if (muted) return;
+// Reuse a single AudioContext instance — creating one per sound is expensive
+let sharedAudioCtx: AudioContext | null = null;
 
+const getAudioCtx = (): AudioContext | null => {
   try {
     const AudioContextClass =
       window.AudioContext ||
       (window as never as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AudioContextClass) return;
+    if (!AudioContextClass) return null;
 
-    const audioCtx = new AudioContextClass();
+    if (!sharedAudioCtx || sharedAudioCtx.state === 'closed') {
+      sharedAudioCtx = new AudioContextClass();
+    }
+    // Resume if suspended (browser autoplay policy)
+    if (sharedAudioCtx.state === 'suspended') {
+      void sharedAudioCtx.resume();
+    }
+    return sharedAudioCtx;
+  } catch {
+    return null;
+  }
+};
+
+export const playSound = (type: SoundType, muted = false): void => {
+  if (muted) return;
+
+  try {
+    const audioCtx = getAudioCtx();
+    if (!audioCtx) return;
     const oscillator = audioCtx.createOscillator();
     const gainNode = audioCtx.createGain();
 

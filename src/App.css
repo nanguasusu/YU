@@ -12,8 +12,9 @@
   position: relative;
   width: 100%;
   max-width: 420px;
-  backdrop-filter: blur(50px);
-  -webkit-backdrop-filter: blur(50px);
+  /* backdrop-filter blur is GPU-intensive; reduced from 50px to 12px */
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.6);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08), inset 0 1px 1px rgba(255, 255, 255, 0.7);
   border-radius: 32px;
@@ -624,7 +625,6 @@
   border-radius: 12px;
   font-size: 15px;
   color: #1d1d1f;
-  backdrop-filter: blur(12px);
   box-sizing: border-box;
 }
 
@@ -1199,13 +1199,8 @@ input:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
-  animation: brand-breathe 4s ease-in-out infinite;
   pointer-events: none;
-}
-
-@keyframes brand-breathe {
-  0%, 100% { opacity: 0.85; transform: scale(1); }
-  50%       { opacity: 1;    transform: scale(1.06); }
+  /* Removed infinite animation — it was the main cause of continuous GPU usage */
 }
 
 /* ── Settings tab scrollable area ── */
