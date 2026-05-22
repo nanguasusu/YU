@@ -1,17 +1,39 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Clock, CheckSquare, BarChart2, Minimize2, ChevronDown } from 'lucide-react';
+import { Clock, CheckSquare, BarChart2, Minimize2 } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
 import { usePersistedState } from './hooks/usePersistedState';
+import { useTagStore } from './hooks/useTagStore';
 import { playSound } from './lib/sound';
 import { BrandClockIcon } from './components/BrandClockIcon';
+import { TagPicker } from './components/TagPicker';
 import { TimerTab } from './components/TimerTab';
 import { TasksTab } from './components/TasksTab';
 import { StatsTab } from './components/StatsTab';
-import { ACTIVITY_TAG_OPTIONS, formatElapsedTime } from './types';
-import type { ActiveTab, TimerStatus } from './types';
+import { formatElapsedTime } from './types';
+import type { ActiveTab, TimerStatus, CustomTag } from './types';
 import './App.css';
+
+/**
+ * 根据 activityTag 和 timerStatus 返回唯一一条状态文案。
+ * 纯函数，无 React 依赖，便于测试。
+ */
+export function getStatusText(activityTag: string, timerStatus: TimerStatus): string {
+  const tag = activityTag.trim();
+
+  if (!tag) return '请选择标签';
+
+  switch (timerStatus) {
+    case 'running':
+      return ` 进行中`;
+    case 'paused':
+      return `已暂停`;
+    case 'idle':
+    default:
+      return `待开始`;
+  }
+}
 
 function MiniTimer({
   accentColor,
@@ -21,6 +43,13 @@ function MiniTimer({
   onToggle,
   onReset,
   onSelectTag,
+  onCreateTag,
+  onDeleteTag,
+  customTags,
+  visibleCustomTags,
+  allCustomTags,
+  hasMoreTags,
+  isAtLimit,
 }: {
   accentColor: string;
   activityTag: string;
@@ -29,37 +58,34 @@ function MiniTimer({
   onToggle: () => void;
   onReset: () => void;
   onSelectTag: (tag: string) => void;
+  onCreateTag: (name: string) => Promise<{ success: boolean; error?: string }>;
+  onDeleteTag: (tagId: number) => Promise<{ success: boolean; error?: string }>;
+  customTags: CustomTag[];
+  visibleCustomTags: CustomTag[];
+  allCustomTags: CustomTag[];
+  hasMoreTags: boolean;
+  isAtLimit: boolean;
 }) {
-  const statusText =
-    !activityTag.trim()
-      ? '请选择标签'
-      : timerStatus === 'running'
-        ? `${activityTag} 中...`
-        : timerStatus === 'paused'
-          ? `${activityTag} 已暂停`
-          : `${activityTag} 待开始`;
+  const statusText = getStatusText(activityTag, timerStatus);
 
   return (
     <div className="mini-timer-shell">
       <div className="mini-timer-head">
-        <label className="mini-tag-picker">
-          <select
-            className="mini-tag-select"
-            value={activityTag}
-            onChange={(e) => onSelectTag(e.target.value)}
-            onMouseDown={(e) => e.stopPropagation()}
-            aria-label="选择当前活动标签"
-          >
-            <option value="">请选择标签</option>
-            {ACTIVITY_TAG_OPTIONS.map((tag) => (
-              <option key={tag} value={tag}>
-                {tag}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="mini-tag-chevron" strokeWidth={2} />
-        </label>
-        <span className="mini-timer-status">{statusText}</span>
+        <TagPicker
+          currentTag={activityTag}
+          onSelectTag={onSelectTag}
+          accentColor={accentColor}
+          customTags={customTags}
+          visibleCustomTags={visibleCustomTags}
+          allCustomTags={allCustomTags}
+          hasMoreTags={hasMoreTags}
+          isAtLimit={isAtLimit}
+          onCreateTag={onCreateTag}
+          onDeleteTag={onDeleteTag}
+        />
+        {activityTag.trim() && (
+          <span className="mini-timer-status">{statusText}</span>
+        )}
       </div>
 
       <button
@@ -82,6 +108,7 @@ function MiniTimer({
 
 export default function App() {
   const state = usePersistedState();
+  const tagStore = useTagStore();
   const [isMinimized, setIsMinimized] = useState(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>('timer');
   const [liveNow, setLiveNow] = useState(() => Date.now());
@@ -124,6 +151,81 @@ export default function App() {
       : state.elapsedMs + Math.max(0, liveNow - state.lastStartedAt);
 
   const timerDisplay = formatElapsedTime(liveElapsedMs);
+
+  const [recordError, setRecordError] = useState<string>('');
+
+  // Auto-clear error after 3 seconds
+  useEffect(() => {
+    if (!recordError) return undefined;
+    const id = setTimeout(() => setRecordError(''), 3000);
+    return () => clearTimeout(id);
+  }, [recordError]);
+
+  const handleSelectTag = useCallback(async (newTag: string) => {
+    // If running and switching tags, record duration for the old tag first
+    if (state.timerStatus === 'running' && state.activityTag.trim()) {
+      const now = Date.now();
+      const elapsed = state.elapsedMs + Math.max(0, now - (state.lastStartedAt ?? now));
+      if (elapsed >= 1000) {
+        const result = await tagStore.recordDuration(state.activityTag, elapsed);
+        if (!result.success) {
+          setRecordError('存储失败，计时数据未保存');
+          // Don't reset elapsedMs, don't proceed with tag switch
+          return;
+        }
+      }
+    }
+
+    if (newTag.trim()) {
+      void tagStore.touchTag(newTag);
+    }
+    state.selectActivityTag(newTag);
+  }, [tagStore, state]);
+
+  const handleToggle = useCallback(async () => {
+    if (!state.activityTag.trim()) return;
+    // If currently running, record duration before pausing
+    if (state.timerStatus === 'running') {
+      const now = Date.now();
+      const sessionMs = Math.max(0, now - (state.lastStartedAt ?? now));
+      if (sessionMs >= 1000) {
+        const result = await tagStore.recordDuration(state.activityTag, sessionMs);
+        if (!result.success) {
+          setRecordError('存储失败，计时数据未保存');
+          // Keep elapsedMs, don't toggle
+          return;
+        }
+      }
+    }
+    state.toggleTimer();
+  }, [state, tagStore]);
+
+  const handleReset = useCallback(async () => {
+    // If currently running, record full elapsed duration before resetting
+    if (state.timerStatus === 'running' && state.activityTag.trim()) {
+      const now = Date.now();
+      const elapsed = state.elapsedMs + Math.max(0, now - (state.lastStartedAt ?? now));
+      if (elapsed >= 1000) {
+        const result = await tagStore.recordDuration(state.activityTag, elapsed);
+        if (!result.success) {
+          setRecordError('存储失败，计时数据未保存');
+          // Keep elapsedMs, don't reset
+          return;
+        }
+      }
+    }
+    state.resetTimer();
+  }, [state, tagStore]);
+
+  const handleDeleteTag = useCallback(async (tagId: number) => {
+    const tagToDelete = tagStore.customTags.find((t) => t.id === tagId);
+    const result = await tagStore.deleteTag(tagId);
+    if (result.success && tagToDelete && tagToDelete.name === state.activityTag) {
+      // Reset timer when the deleted tag is the current activity tag
+      state.selectActivityTag('');
+    }
+    return result;
+  }, [tagStore, state]);
 
   const changeTab = (tab: ActiveTab) => {
     if (activeTab === tab) return;
@@ -180,9 +282,16 @@ export default function App() {
                   activityTag={state.activityTag}
                   timerStatus={state.timerStatus}
                   displayTime={timerDisplay}
-                  onToggle={state.toggleTimer}
-                  onReset={state.resetTimer}
-                  onSelectTag={state.selectActivityTag}
+                  onToggle={handleToggle}
+                  onReset={handleReset}
+                  onSelectTag={handleSelectTag}
+                  onCreateTag={tagStore.createTag}
+                  onDeleteTag={handleDeleteTag}
+                  customTags={tagStore.customTags}
+                  visibleCustomTags={tagStore.visibleCustomTags}
+                  allCustomTags={tagStore.allCustomTags}
+                  hasMoreTags={tagStore.hasMoreTags}
+                  isAtLimit={tagStore.isAtLimit}
                 />
               </div>
             </div>
@@ -267,6 +376,12 @@ export default function App() {
           ))}
         </div>
       </div>
+
+      {recordError && (
+        <div className="record-error-toast" role="alert">
+          {recordError}
+        </div>
+      )}
     </div>
   );
 }

@@ -106,3 +106,34 @@ export const formatElapsedTime = (elapsedMs: number): string => {
 
   return [hours, minutes, seconds].map((part) => String(part).padStart(2, '0')).join(':');
 };
+
+// --- Tag Store Types ---
+
+export type CustomTag = {
+  /** 唯一标识，使用创建时的时间戳 */
+  id: number;
+  /** 标签名称，最大 10 个 Unicode 字符 */
+  name: string;
+  /** 创建时间戳 */
+  createdAt: number;
+  /** 最近一次被选中的时间戳，用于排序 */
+  lastUsedAt: number;
+};
+
+export type TagRecord = {
+  /** 标签名称（关联 key） */
+  tagName: string;
+  /** 累计计时总时长（毫秒） */
+  totalMs: number;
+  /** 最后一次记录的时间戳 */
+  lastRecordedAt: number;
+};
+
+export type TagStoreData = {
+  /** 用户创建的自定义标签列表 */
+  customTags: CustomTag[];
+  /** 每个标签的累计计时记录 */
+  tagRecords: TagRecord[];
+};
+
+export const TAG_STORE_KEY = 'countdown-widget-tag-store';
