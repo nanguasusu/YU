@@ -264,10 +264,24 @@
   height: 100%;
   padding: 0.36rem 0.68rem 0.6rem;
   border-radius: 30px;
+  /*
+   * 内层背景跟随全局透明度变量 --widget-opacity（由外层容器注入）。
+   * 当透明度为 1 时效果与原来相同；降低时内层白色背景同步变透明。
+   * calc() 将固定 alpha 值乘以 --widget-opacity，实现联动。
+   */
   background:
-    radial-gradient(circle at top, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.72) 56%, rgba(255, 255, 255, 0.6)),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.12));
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.6);
+    radial-gradient(
+      circle at top,
+      rgba(255, 255, 255, calc(0.95 * var(--widget-opacity, 1))),
+      rgba(255, 255, 255, calc(0.72 * var(--widget-opacity, 1))) 56%,
+      rgba(255, 255, 255, calc(0.60 * var(--widget-opacity, 1)))
+    ),
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, calc(0.24 * var(--widget-opacity, 1))),
+      rgba(255, 255, 255, calc(0.12 * var(--widget-opacity, 1)))
+    );
+  /* box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.6); */
 }
 
 .mini-timer-head {
@@ -996,6 +1010,8 @@
   max-height: 230px;
   overflow-y: auto;
   padding-right: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(134, 134, 139, 0.28) transparent;
 }
 
 .progress-list-scroll::-webkit-scrollbar {
@@ -1565,6 +1581,120 @@ input:focus-visible {
   /* Removed infinite animation — it was the main cause of continuous GPU usage */
 }
 
+/* ── Brand icon as clickable button ── */
+.brand-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: opacity 0.15s, transform 0.15s;
+  pointer-events: auto;
+  outline: none;
+}
+
+.brand-icon-btn:hover {
+  opacity: 0.8;
+  transform: scale(1.08);
+}
+
+.brand-icon-btn:active {
+  transform: scale(0.96);
+}
+
+/* ── Mode switch menu wrapper ── */
+.brand-icon-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* Transparent full-screen backdrop — closes menu on outside click */
+.mode-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 99;
+  background: transparent;
+}
+
+/* ── Mode menu popup ── */
+.mode-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 100;
+  min-width: 160px;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.06);
+  padding: 6px;
+  user-select: none;
+}
+
+.mode-menu-current {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 8px;
+}
+
+.mode-menu-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.mode-menu-current-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1d1d1f;
+  flex: 1;
+}
+
+.mode-menu-badge {
+  font-size: 11px;
+  color: #86868b;
+  font-weight: 500;
+}
+
+.mode-menu-divider {
+  height: 1px;
+  background: rgba(0, 0, 0, 0.06);
+  margin: 4px 2px;
+}
+
+.mode-menu-switch {
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #1d1d1f;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s;
+  outline: none;
+}
+
+.mode-menu-switch:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.mode-menu-switch:active {
+  background: rgba(0, 0, 0, 0.09);
+}
+
 /* ── Settings tab scrollable area ── */
 .settings-scroll {
   height: 100%;
@@ -1981,18 +2111,19 @@ input:focus-visible {
 /* ── Record Error Toast ── */
 .record-error-toast {
   position: fixed;
-  bottom: 24px;
+  bottom: 1.5rem;
   left: 50%;
   transform: translateX(-50%);
+  z-index: 9999;
   background: rgba(255, 69, 58, 0.92);
   color: #fff;
-  font-size: 13px;
-  font-weight: 600;
-  padding: 8px 16px;
+  padding: 0.6rem 1.2rem;
   border-radius: 12px;
-  box-shadow: 0 4px 16px rgba(255, 69, 58, 0.3);
-  z-index: 9999;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 4px 16px rgba(255, 69, 58, 0.28);
   pointer-events: none;
+  white-space: nowrap;
   animation: toast-fade-in 0.2s ease-out;
 }
 
@@ -2005,4 +2136,653 @@ input:focus-visible {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
   }
+}
+
+
+/* ── Timer Start Page (tsp) ── */
+.tsp-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  flex-grow: 1;
+  padding: 0.25rem 0 1.25rem;
+}
+
+/* Tag picker row — centered, same style as the tab-header line */
+.tsp-tag-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+/* Override TagPicker trigger to look like the countdown's inline title button */
+.tsp-tag-row .tag-picker-trigger {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1d1d1f;
+  gap: 4px;
+}
+
+.tsp-tag-row .tag-picker-value {
+  max-width: 140px;
+}
+
+.tsp-tag-row .tag-picker-chevron {
+  width: 13px;
+  height: 13px;
+  color: #86868b;
+}
+
+/* Central time block — no card, number floats freely */
+.tsp-time-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.tsp-time {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", ui-monospace, monospace;
+  font-size: 52px;
+  font-weight: 600;
+  letter-spacing: -1px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  /* color set via inline style (accentColor) */
+}
+
+.tsp-status {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #86868b;
+  letter-spacing: 0.3px;
+}
+
+.tsp-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  /* background-color set via inline style (accentColor) */
+}
+
+/* Action row — three balanced buttons */
+.tsp-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+}
+
+/* Ghost side buttons: 重置 / 结束 */
+.tsp-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 40px;
+  min-height: 36px;
+  min-width: 60px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.5);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.55);
+  color: #86868b;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+  white-space: nowrap;
+}
+
+.tsp-btn-ghost:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.75);
+  color: #1d1d1f;
+}
+
+.tsp-btn-ghost:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Primary center button: 开始 / 暂停 / 继续 */
+.tsp-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  min-height: 36px;
+  min-width: 72px;
+  padding: 8px 20px;
+  /* background-color set via inline style (accentColor) */
+  color: #ffffff;
+  border: none;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.2s, opacity 0.2s;
+  white-space: nowrap;
+}
+
+.tsp-btn-primary:hover:not(:disabled) {
+  filter: brightness(0.88);
+}
+
+.tsp-btn-primary:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ── Timer Timeline Page (tl) ── */
+.tl-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.tl-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  flex-shrink: 0;
+}
+
+.tl-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #86868b;
+  letter-spacing: 0.04em;
+}
+
+.tl-count {
+  font-size: 12px;
+  color: #86868b;
+  font-weight: 500;
+}
+
+/* Wrapper holds the scroll area + custom scrollbar + fade masks */
+.tl-scroll-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.tl-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  /* Hide native scrollbar on all browsers */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  /* Give room for the custom 3px scrollbar on the right */
+  padding-right: 8px;
+}
+
+.tl-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Custom scrollbar ── */
+.tl-scrollbar-track {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  right: 0;
+  width: 3px;
+  border-radius: 999px;
+  /* No visible track background — fully invisible until thumb appears */
+  pointer-events: none;
+}
+
+.tl-scrollbar-thumb {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-radius: 999px;
+  background: rgba(134, 134, 139, 0.45);
+  transition: opacity 0.3s ease, background-color 0.2s ease;
+  pointer-events: none;
+  min-height: 20px;
+}
+
+/* Slightly more visible on hover of the wrapper */
+.tl-scroll-wrap:hover .tl-scrollbar-thumb {
+  background: rgba(134, 134, 139, 0.6);
+}
+
+/* ── Top / bottom fade masks ── */
+.tl-fade-top,
+.tl-fade-bottom {
+  position: absolute;
+  left: 0;
+  right: 8px; /* align with scroll area, not the scrollbar track */
+  height: 24px;
+  pointer-events: none;
+  z-index: 1;
+  transition: opacity 0.25s ease;
+}
+
+.tl-fade-top {
+  top: 0;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.85), transparent);
+}
+
+.tl-fade-bottom {
+  bottom: 0;
+  background: linear-gradient(to top, rgba(255, 255, 255, 0.85), transparent);
+}
+
+.tl-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 0;
+  color: #86868b;
+  font-size: 13px;
+}
+
+.tl-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.tl-item {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+}
+
+/* Left spine column */
+.tl-spine {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  width: 12px;
+  padding-top: 4px;
+}
+
+.tl-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.tl-line {
+  flex: 1;
+  width: 1px;
+  background: rgba(134, 134, 139, 0.2);
+  margin-top: 4px;
+  min-height: 12px;
+}
+
+/* Content column */
+.tl-content {
+  flex: 1;
+  min-width: 0;
+  padding-bottom: 0.5rem;
+}
+
+.tl-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 2px;
+}
+
+.tl-time-range {
+  font-size: 11px;
+  color: #86868b;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.tl-duration {
+  font-size: 11px;
+  color: #86868b;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.tl-item-title {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #1d1d1f;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tl-item-tag {
+  display: inline-block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: #86868b;
+  background: rgba(134, 134, 139, 0.1);
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+
+/* ── Timer Stats Page (ts) ── */
+.ts-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.ts-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 1.1rem;
+  flex-shrink: 0;
+}
+
+.ts-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1d1d1f;
+}
+
+.ts-total {
+  font-size: 13px;
+  color: #86868b;
+  font-weight: 400;
+}
+
+.ts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  flex: 1;
+  min-height: 0;
+}
+
+.ts-list::-webkit-scrollbar {
+  display: none;
+}
+
+.ts-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.ts-item-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.ts-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.ts-tag {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+  color: #1d1d1f;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ts-time {
+  font-size: 13px;
+  font-weight: 500;
+  color: #1d1d1f;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.ts-pct {
+  color: #86868b;
+  font-weight: 400;
+}
+
+.ts-bar-bg {
+  height: 4px;
+  background-color: rgba(0, 0, 0, 0.04);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.ts-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.5s ease-out;
+}
+
+.ts-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem 0;
+  color: #86868b;
+  font-size: 13px;
+  flex: 1;
+}
+
+/* ── Settings: section divider + label ── */
+.settings-section-divider {
+  height: 1px;
+  background: rgba(0, 0, 0, 0.06);
+  margin: 0.25rem 0;
+}
+
+.settings-section-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #86868b;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 0.1rem 0 0.25rem;
+}
+
+/* ── Settings: nav row (entry to sub-page) ── */
+.settings-nav-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.6rem 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.settings-nav-row:hover .settings-nav-row-label {
+  color: #007aff;
+}
+
+.settings-nav-row-label {
+  font-size: 15px;
+  color: #1d1d1f;
+  transition: color 0.15s;
+}
+
+.settings-nav-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: #86868b;
+}
+
+.settings-nav-row-chevron {
+  color: #c7c7cc;
+}
+
+/* ── Timer Labels sub-page (stl) ── */
+.stl-topbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  margin-bottom: 1rem;
+  flex-shrink: 0;
+}
+
+.stl-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border: none;
+  background: transparent;
+  color: #86868b;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s;
+}
+
+.stl-back-btn:hover {
+  color: #1d1d1f;
+}
+
+.stl-page-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1d1d1f;
+  flex: 1;
+  text-align: center;
+  /* offset for back button width so title appears visually centered */
+  margin-right: 40px;
+}
+
+.stl-label-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 1rem;
+}
+
+.stl-empty {
+  font-size: 13px;
+  color: #86868b;
+  padding: 0.5rem 0;
+}
+
+.stl-label-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.55rem 0.75rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+.stl-label-name {
+  font-size: 14px;
+  color: #1d1d1f;
+  font-weight: 500;
+}
+
+.stl-delete-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  color: #c7c7cc;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: color 0.15s, background-color 0.15s;
+  flex-shrink: 0;
+}
+
+.stl-delete-btn:hover {
+  color: #ff453a;
+  background: rgba(255, 69, 58, 0.08);
+}
+
+.stl-add-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 0.35rem;
+}
+
+.stl-add-input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 10px;
+  padding: 0.55rem 0.75rem;
+  font-size: 14px;
+  color: #1d1d1f;
+  outline: none;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.stl-add-input::placeholder {
+  color: #86868b;
+}
+
+.stl-add-input:focus {
+  border-color: rgba(0, 122, 255, 0.35);
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.stl-add-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background-color 0.15s, opacity 0.15s;
+  flex-shrink: 0;
+}
+
+.stl-add-btn:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.stl-add-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.stl-error {
+  font-size: 12px;
+  color: #ff453a;
+  padding: 0 0.25rem;
 }
