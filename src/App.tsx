@@ -1,19 +1,23 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Clock, CheckSquare, BarChart2, Minimize2 } from 'lucide-react';
-import { AnimatePresence } from 'motion/react';
+import { Minimize2 } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
 import { usePersistedState } from './hooks/usePersistedState';
 import { useTagStore } from './hooks/useTagStore';
+import { useAppMode } from './hooks/useAppMode';
+import { useTimerRecords } from './hooks/useTimerRecords';
+import { useLiveElapsedMs } from './hooks/useLiveElapsedMs';
 import { playSound } from './lib/sound';
 import { BrandClockIcon } from './components/BrandClockIcon';
+import { ModeMenu } from './components/ModeMenu';
 import { TagPicker } from './components/TagPicker';
-import { TimerTab } from './components/TimerTab';
-import { TasksTab } from './components/TasksTab';
-import { StatsTab } from './components/StatsTab';
+import { WidgetLayout } from './components/WidgetLayout';
+import { TimerLayout } from './components/TimerLayout';
 import { formatElapsedTime } from './types';
-import type { ActiveTab, TimerStatus, CustomTag } from './types';
+import type { AppMode, TimerStatus, WindowState, WidgetTab, TimerTab } from './types';
 import './App.css';
+
+const ALL_APP_MODES: AppMode[] = ['widget', 'timer'];
 
 /**
  * 根据 activityTag 和 timerStatus 返回唯一一条状态文案。
@@ -43,13 +47,7 @@ function MiniTimer({
   onToggle,
   onReset,
   onSelectTag,
-  onCreateTag,
-  onDeleteTag,
-  customTags,
-  visibleCustomTags,
-  allCustomTags,
-  hasMoreTags,
-  isAtLimit,
+  timerLabels,
 }: {
   accentColor: string;
   activityTag: string;
@@ -58,13 +56,7 @@ function MiniTimer({
   onToggle: () => void;
   onReset: () => void;
   onSelectTag: (tag: string) => void;
-  onCreateTag: (name: string) => Promise<{ success: boolean; error?: string }>;
-  onDeleteTag: (tagId: number) => Promise<{ success: boolean; error?: string }>;
-  customTags: CustomTag[];
-  visibleCustomTags: CustomTag[];
-  allCustomTags: CustomTag[];
-  hasMoreTags: boolean;
-  isAtLimit: boolean;
+  timerLabels: string[];
 }) {
   const statusText = getStatusText(activityTag, timerStatus);
 
@@ -75,13 +67,7 @@ function MiniTimer({
           currentTag={activityTag}
           onSelectTag={onSelectTag}
           accentColor={accentColor}
-          customTags={customTags}
-          visibleCustomTags={visibleCustomTags}
-          allCustomTags={allCustomTags}
-          hasMoreTags={hasMoreTags}
-          isAtLimit={isAtLimit}
-          onCreateTag={onCreateTag}
-          onDeleteTag={onDeleteTag}
+          labels={timerLabels}
         />
         {activityTag.trim() && (
           <span className="mini-timer-status">{statusText}</span>
@@ -109,9 +95,14 @@ function MiniTimer({
 export default function App() {
   const state = usePersistedState();
   const tagStore = useTagStore();
-  const [isMinimized, setIsMinimized] = useState(false);
-  const [activeTab, setActiveTab] = useState<ActiveTab>('timer');
-  const [liveNow, setLiveNow] = useState(() => Date.now());
+
+  // --- Task 11.1: New hooks and state ---
+  const { appMode, setAppMode } = useAppMode();
+  const { addRecord, getTodayRecords } = useTimerRecords();
+  const [windowState, setWindowState] = useState<WindowState>('full');
+  const [widgetTab, setWidgetTab] = useState<WidgetTab>('countdown');
+  const [timerTab, setTimerTab] = useState<TimerTab>('start');
+  const [modeMenuOpen, setModeMenuOpen] = useState(false);
 
   const trimTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -135,20 +126,7 @@ export default function App() {
     }
   }, []);
 
-  useEffect(() => {
-    if (state.timerStatus !== 'running') return undefined;
-    const id = window.setInterval(() => setLiveNow(Date.now()), 1000);
-    return () => window.clearInterval(id);
-  }, [state.timerStatus]);
-
-  useEffect(() => {
-    setLiveNow(Date.now());
-  }, [state.timerStatus, state.elapsedMs, state.lastStartedAt]);
-
-  const liveElapsedMs =
-    state.timerStatus !== 'running' || state.lastStartedAt === null
-      ? state.elapsedMs
-      : state.elapsedMs + Math.max(0, liveNow - state.lastStartedAt);
+  const liveElapsedMs = useLiveElapsedMs(state.timerStatus, state.elapsedMs, state.lastStartedAt);
 
   const timerDisplay = formatElapsedTime(liveElapsedMs);
 
@@ -161,82 +139,58 @@ export default function App() {
     return () => clearTimeout(id);
   }, [recordError]);
 
-  const handleSelectTag = useCallback(async (newTag: string) => {
-    // If running and switching tags, record duration for the old tag first
-    if (state.timerStatus === 'running' && state.activityTag.trim()) {
-      const now = Date.now();
-      const elapsed = state.elapsedMs + Math.max(0, now - (state.lastStartedAt ?? now));
-      if (elapsed >= 1000) {
-        const result = await tagStore.recordDuration(state.activityTag, elapsed);
-        if (!result.success) {
-          setRecordError('存储失败，计时数据未保存');
-          // Don't reset elapsedMs, don't proceed with tag switch
-          return;
-        }
-      }
+  const flushCurrentSession = useCallback(async (): Promise<boolean> => {
+    // 不需要 flush 的情况
+    if (state.timerStatus !== 'running' || !state.activityTag.trim()) {
+      return true;
     }
 
-    if (newTag.trim()) {
-      void tagStore.touchTag(newTag);
+    const now = Date.now();
+    const elapsed =
+      state.elapsedMs + Math.max(0, now - (state.lastStartedAt ?? now));
+
+    if (elapsed < 1000) return true;
+
+    const result = await tagStore.recordDuration(state.activityTag, elapsed);
+    if (!result.success) {
+      setRecordError('存储失败，计时数据未保存');
+      return false;
     }
+    return true;
+  }, [state.timerStatus, state.activityTag, state.elapsedMs, state.lastStartedAt, tagStore]);
+
+  const handleSelectTag = useCallback(async (newTag: string) => {
+    const ok = await flushCurrentSession();
+    if (!ok) return;
+    if (newTag.trim()) void tagStore.touchTag(newTag);
     state.selectActivityTag(newTag);
-  }, [tagStore, state]);
+  }, [flushCurrentSession, tagStore, state]);
 
   const handleToggle = useCallback(async () => {
     if (!state.activityTag.trim()) return;
-    // If currently running, record duration before pausing
     if (state.timerStatus === 'running') {
-      const now = Date.now();
-      const sessionMs = Math.max(0, now - (state.lastStartedAt ?? now));
-      if (sessionMs >= 1000) {
-        const result = await tagStore.recordDuration(state.activityTag, sessionMs);
-        if (!result.success) {
-          setRecordError('存储失败，计时数据未保存');
-          // Keep elapsedMs, don't toggle
-          return;
-        }
-      }
+      const ok = await flushCurrentSession();
+      if (!ok) return;
     }
     state.toggleTimer();
-  }, [state, tagStore]);
+  }, [flushCurrentSession, state]);
 
   const handleReset = useCallback(async () => {
-    // If currently running, record full elapsed duration before resetting
-    if (state.timerStatus === 'running' && state.activityTag.trim()) {
-      const now = Date.now();
-      const elapsed = state.elapsedMs + Math.max(0, now - (state.lastStartedAt ?? now));
-      if (elapsed >= 1000) {
-        const result = await tagStore.recordDuration(state.activityTag, elapsed);
-        if (!result.success) {
-          setRecordError('存储失败，计时数据未保存');
-          // Keep elapsedMs, don't reset
-          return;
-        }
-      }
-    }
+    const ok = await flushCurrentSession();
+    if (!ok) return;
     state.resetTimer();
-  }, [state, tagStore]);
+  }, [flushCurrentSession, state]);
 
-  const handleDeleteTag = useCallback(async (tagId: number) => {
-    const tagToDelete = tagStore.customTags.find((t) => t.id === tagId);
-    const result = await tagStore.deleteTag(tagId);
-    if (result.success && tagToDelete && tagToDelete.name === state.activityTag) {
-      // Reset timer when the deleted tag is the current activity tag
-      state.selectActivityTag('');
+  // --- Task 11.3: Updated minimize handler ---
+  const handleMinimize = useCallback(() => {
+    if (appMode === 'timer') {
+      playSound('minimize', state.isMuted);
+      setWindowState('mini');
+    } else {
+      playSound('minimize', state.isMuted);
+      void getCurrentWindow().hide();
     }
-    return result;
-  }, [tagStore, state]);
-
-  const changeTab = (tab: ActiveTab) => {
-    if (activeTab === tab) return;
-    playSound('click', state.isMuted);
-    setActiveTab(tab);
-  };
-
-  const toggleMinimize = () => {
-    playSound(isMinimized ? 'unminimize' : 'minimize', state.isMuted);
-    setIsMinimized((value) => !value);
-  };
+  }, [appMode, state.isMuted]);
 
   const tryStartResizeDrag = async () => {
     try { await getCurrentWindow().startResizeDragging('East'); } catch { /* non-Tauri */ }
@@ -252,10 +206,73 @@ export default function App() {
     void tryStartWindowDrag();
   };
 
+  // --- Task 6.1: Merge timerLabels with visibleCustomTags ---
+  const mergedLabels = tagStore.isLoaded
+    ? Array.from(new Set([...state.timerLabels, ...tagStore.visibleCustomTags.map((t) => t.name)]))
+    : state.timerLabels;
+
+  // --- Task 11.2: Dual-mode render logic ---
+
+  // Mini-timer: only in timer mode
+  if (windowState === 'mini' && appMode === 'timer') {
+    return (
+      <div className="app-wrapper">
+        <div
+          className="widget-container widget-minimized"
+          style={{
+            backgroundColor: `rgba(255, 255, 255, ${state.widgetOpacity / 100})`,
+            maxWidth: state.widgetWidth,
+            // 将透明度比例暴露为 CSS 变量，供内层元素复用
+            ['--widget-opacity' as string]: state.widgetOpacity / 100,
+          }}
+        >
+          <div
+            className="resize-handle-east"
+            onMouseDown={() => void tryStartResizeDrag()}
+            title="拖拽调整宽度"
+            aria-hidden="true"
+          />
+          <div
+            className="top-bar top-bar-minimized"
+            onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+          >
+            <div className="top-bar-drag-zone mini-drag-zone" onMouseDown={handleWindowDragMouseDown}>
+              <div className="mini-info mini-info-visible">
+                <MiniTimer
+                  accentColor={state.accentColor}
+                  activityTag={state.activityTag}
+                  timerStatus={state.timerStatus}
+                  displayTime={timerDisplay}
+                  onToggle={handleToggle}
+                  onReset={handleReset}
+                  onSelectTag={handleSelectTag}
+                  timerLabels={mergedLabels}
+                />
+              </div>
+            </div>
+            <div className="top-actions">
+              <button
+                type="button"
+                className="icon-button"
+                onClick={(e) => { e.stopPropagation(); setWindowState('full'); }}
+                onMouseDown={(e) => e.stopPropagation()}
+                aria-label="展开组件"
+              >
+                <Minimize2 className="action-icon icon-rotate-180" strokeWidth={2} />
+              </button>
+            </div>
+          </div>
+        </div>
+        {recordError && <div className="record-error-toast" role="alert">{recordError}</div>}
+      </div>
+    );
+  }
+
+  // Full layouts
   return (
     <div className="app-wrapper">
       <div
-        className={`widget-container ${isMinimized ? 'widget-minimized' : 'widget-expanded'}`}
+        className="widget-container widget-expanded"
         style={{
           backgroundColor: `rgba(255, 255, 255, ${state.widgetOpacity / 100})`,
           maxWidth: state.widgetWidth,
@@ -270,118 +287,78 @@ export default function App() {
           aria-hidden="true"
         />
 
+        {/* Top bar */}
         <div
-          className={`top-bar ${isMinimized ? 'top-bar-minimized' : 'top-bar-expanded'}`}
+          className="top-bar top-bar-expanded"
           onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
         >
-          {isMinimized ? (
-            <div className="top-bar-drag-zone mini-drag-zone" onMouseDown={handleWindowDragMouseDown}>
-              <div className="mini-info mini-info-visible">
-                <MiniTimer
-                  accentColor={state.accentColor}
-                  activityTag={state.activityTag}
-                  timerStatus={state.timerStatus}
-                  displayTime={timerDisplay}
-                  onToggle={handleToggle}
-                  onReset={handleReset}
-                  onSelectTag={handleSelectTag}
-                  onCreateTag={tagStore.createTag}
-                  onDeleteTag={handleDeleteTag}
-                  customTags={tagStore.customTags}
-                  visibleCustomTags={tagStore.visibleCustomTags}
-                  allCustomTags={tagStore.allCustomTags}
-                  hasMoreTags={tagStore.hasMoreTags}
-                  isAtLimit={tagStore.isAtLimit}
-                />
-              </div>
+          <div className="top-bar-drag-zone" onMouseDown={handleWindowDragMouseDown}>
+            {/* Brand icon doubles as mode-switch entry */}
+            <div className="brand-icon-wrap">
+              <BrandClockIcon
+                accentColor={state.accentColor}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setModeMenuOpen((prev) => !prev);
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+                ariaLabel={`当前：${appMode === 'widget' ? '桌面挂件' : '计时钟'}，点击切换模式`}
+              />
+              {modeMenuOpen && (
+                <>
+                  {/* Transparent backdrop to close menu on outside click */}
+                  <div
+                    className="mode-menu-backdrop"
+                    onMouseDown={() => setModeMenuOpen(false)}
+                  />
+                  <ModeMenu
+                    appMode={appMode}
+                    accentColor={state.accentColor}
+                    onSwitch={(mode: AppMode) => void setAppMode(mode)}
+                    onClose={() => setModeMenuOpen(false)}
+                    availableModes={ALL_APP_MODES.filter((m) => m !== appMode)}
+                  />
+                </>
+              )}
             </div>
-          ) : (
-            <div className="top-bar-drag-zone" onMouseDown={handleWindowDragMouseDown}>
-              <BrandClockIcon accentColor={state.accentColor} />
-            </div>
-          )}
-
+          </div>
           <div className="top-actions">
             <button
               type="button"
               className="icon-button"
-              onClick={(e) => { e.stopPropagation(); toggleMinimize(); }}
+              onClick={(e) => { e.stopPropagation(); handleMinimize(); }}
               onMouseDown={(e) => e.stopPropagation()}
-              aria-label={isMinimized ? '展开组件' : '最小化组件'}
+              aria-label="最小化组件"
             >
-              <Minimize2
-                className={`action-icon ${isMinimized ? 'icon-rotate-180' : ''}`}
-                strokeWidth={2}
-              />
+              <Minimize2 className="action-icon" strokeWidth={2} />
             </button>
           </div>
         </div>
 
-        <div className={`content-area ${isMinimized ? 'content-hidden' : 'content-visible'}`}>
-          <AnimatePresence mode="wait">
-            {activeTab === 'timer' && (
-              <TimerTab
-                targetTitle={state.targetTitle}
-                setTargetTitle={state.setTargetTitle}
-                targetDate={state.targetDate}
-                setTargetDate={state.setTargetDate}
-                countdownStyle={state.countdownStyle}
-                accentColor={state.accentColor}
-              />
-            )}
-            {activeTab === 'tasks' && (
-              <TasksTab
-                tasks={state.tasks}
-                accentColor={state.accentColor}
-                onToggle={state.toggleTask}
-                onDelete={state.deleteTask}
-                onAdd={state.addTask}
-                onClearCompleted={state.clearCompletedTasks}
-                onSound={(type) => playSound(type, state.isMuted)}
-              />
-            )}
-            {activeTab === 'stats' && (
-              <StatsTab
-                progressItems={state.progressItems}
-                onAdd={state.addProgress}
-                onDelete={state.deleteProgress}
-                onUpdateTitle={state.updateProgressTitle}
-                onNormalizeTitle={state.normalizeProgressTitle}
-                onUpdateTotal={state.updateProgressTotal}
-                onUpdateProgress={state.updateProgress}
-                onSound={(type) => playSound(type, state.isMuted)}
-              />
-            )}
-          </AnimatePresence>
-        </div>
-
-        <div className={`bottom-nav ${isMinimized ? 'bottom-nav-hidden' : 'bottom-nav-visible'}`}>
-          {(
-            [
-              { tab: 'timer', Icon: Clock, label: '计时器' },
-              { tab: 'tasks', Icon: CheckSquare, label: '任务列表' },
-              { tab: 'stats', Icon: BarChart2, label: '进度统计' },
-            ] as const
-          ).map(({ tab, Icon, label }) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => changeTab(tab)}
-              className={`nav-btn ${activeTab === tab ? 'nav-btn-active' : 'nav-btn-inactive'}`}
-              style={activeTab === tab ? { color: state.accentColor } : undefined}
-              aria-label={label}
-            >
-              <Icon className="nav-icon" strokeWidth={2} />
-            </button>
-          ))}
-        </div>
+        {/* Content: delegate to WidgetLayout or TimerLayout */}
+        {appMode === 'widget' ? (
+          <WidgetLayout
+            activeTab={widgetTab}
+            setActiveTab={setWidgetTab}
+            state={state}
+            tagStore={tagStore}
+            accentColor={state.accentColor}
+            onSound={(type) => playSound(type, state.isMuted)}
+          />
+        ) : (
+          <TimerLayout
+            timerTab={timerTab}
+            setTimerTab={setTimerTab}
+            records={getTodayRecords()}
+            addRecord={addRecord}
+            state={state}
+            accentColor={state.accentColor}
+            timerLabels={mergedLabels}
+            activeTag={state.activityTag.trim() || undefined}
+          />
+        )}
       </div>
-
-      {recordError && (
-        <div className="record-error-toast" role="alert">
-          {recordError}
-        </div>
-      )}
+      {recordError && <div className="record-error-toast" role="alert">{recordError}</div>}
     </div>
   );
 }
