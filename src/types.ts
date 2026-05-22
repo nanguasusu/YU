@@ -53,6 +53,7 @@ export type PersistedState = {
   timerStatus: TimerStatus;
   elapsedMs: number;
   lastStartedAt: number | null;
+  timerLabels: string[];
 };
 
 export const defaultTasks: TaskItem[] = [
@@ -64,6 +65,9 @@ export const defaultProgressItems: ProgressItem[] = [
   { id: 1, title: '研究生开题报告', current: 41, total: 50, color: PROGRESS_COLORS[0] },
   { id: 2, title: '遥感影像预处理', current: 5, total: 20, color: PROGRESS_COLORS[1] },
 ];
+
+export const DEFAULT_TIMER_LABELS: string[] = ['Coding', '学习', '阅读', '休息'];
+export const TIMER_LABELS_KEY = 'timer-labels';
 
 export const DEFAULT_STATE: PersistedState = {
   targetTitle: DEFAULT_TARGET_TITLE,
@@ -79,6 +83,7 @@ export const DEFAULT_STATE: PersistedState = {
   timerStatus: 'idle',
   elapsedMs: 0,
   lastStartedAt: null,
+  timerLabels: DEFAULT_TIMER_LABELS,
 };
 
 export const buildDateFromInput = (value: string) => new Date(`${value}T00:00:00`);
@@ -137,3 +142,99 @@ export type TagStoreData = {
 };
 
 export const TAG_STORE_KEY = 'countdown-widget-tag-store';
+
+// --- Dual-mode types ---
+
+export type AppMode = 'widget' | 'timer';
+export type WindowState = 'full' | 'mini' | 'hidden';
+export type WidgetTab = 'countdown' | 'tasks' | 'progress';
+export type TimerTab = 'start' | 'timeline' | 'stats';
+
+export type TimerRecord = {
+  id: string;           // crypto.randomUUID() or timestamp fallback
+  title: string;        // tag name when no explicit title
+  tag?: string;         // selected activity tag
+  startTime: number;    // Unix ms timestamp
+  endTime: number;      // Unix ms timestamp
+  duration: number;     // total elapsed ms (must be >= 1000 to persist)
+  note?: string;        // optional user note (future use)
+};
+
+export const TIMER_RECORDS_KEY = 'timer-records';
+export const APP_MODE_KEY = 'app-mode';
+
+// --- Tag color system ---
+
+/**
+ * Soft, low-saturation color tokens for per-tag coloring.
+ * The global accent color is reserved for the top tag / active timer.
+ */
+export const SOFT_COLOR_TOKENS = [
+  'softBlue',
+  'softPurple',
+  'softGreen',
+  'softOrange',
+  'softRose',
+  'softTeal',
+  'softGray',
+] as const;
+
+export type SoftColorToken = (typeof SOFT_COLOR_TOKENS)[number];
+
+/** CSS variable values for each soft token */
+export const SOFT_COLOR_VALUES: Record<SoftColorToken, string> = {
+  softBlue:   '#8ab4e8',   // 柔和蓝，降饱和
+  softPurple: '#a89cc8',   // 柔和紫，降饱和去艳
+  softGreen:  '#7dba8c',   // 柔和绿，略降亮度
+  softOrange: '#d4956a',   // 柔和橙棕，去掉高饱和黄橙
+  softRose:   '#d4899e',   // 柔和玫瑰，降饱和
+  softTeal:   '#72b0aa',   // 柔和青绿，降饱和
+  softGray:   '#9eadb8',   // 柔和蓝灰
+};
+
+/**
+ * Future-proof tag type.
+ * colorToken is optional — when absent the system auto-assigns from the soft palette.
+ * Backward-compatible: existing string[] tag names still work via resolveTagName().
+ */
+export type TimerTag = {
+  id: string;
+  name: string;
+  colorToken?: SoftColorToken;
+};
+
+/**
+ * Format a duration in milliseconds to a human-readable string.
+ * < 1 hour  → "X分钟"
+ * >= 1 hour → "X小时Y分钟" (or "X小时" if minutes === 0)
+ */
+export function formatDuration(ms: number): string {
+  const totalMinutes = Math.max(0, Math.floor(ms / 60_000));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours === 0) return `${minutes}分钟`;
+  return minutes === 0 ? `${hours}小时` : `${hours}小时${minutes}分钟`;
+}
+
+/**
+ * Format a start/end timestamp pair as "HH:MM - HH:MM" in local time.
+ */
+export function formatTimeRange(startTime: number, endTime: number): string {
+  const fmt = (ts: number) => {
+    const d = new Date(ts);
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  };
+  return `${fmt(startTime)} - ${fmt(endTime)}`;
+}
+
+/**
+ * Format a total duration for the stats header badge.
+ * < 1 hour  → "X分钟"
+ * >= 1 hour → "X.X小时"
+ */
+export function formatTotalHours(ms: number): string {
+  const totalMinutes = Math.max(0, Math.floor(ms / 60_000));
+  if (totalMinutes < 60) return `${totalMinutes}分钟`;
+  const hours = ms / 3_600_000;
+  return `${hours.toFixed(1)}小时`;
+}
