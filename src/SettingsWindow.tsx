@@ -80,6 +80,8 @@ export default function SettingsWindow() {
             setAccentColor={state.setAccentColor}
             autostart={state.autostart}
             toggleAutostart={state.toggleAutostart}
+            timerLabels={state.timerLabels}
+            setTimerLabels={state.setTimerLabels}
             onSound={(type) => playSound(type, state.isMuted)}
           />
         </div>

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { appStateStore, loadPersistedState, mergePersistedState } from '../lib/storage';
-import { buildDateFromInput, formatDateInput, PROGRESS_COLORS, DEFAULT_STATE } from '../types';
+import { buildDateFromInput, formatDateInput, PROGRESS_COLORS, DEFAULT_STATE, DEFAULT_TIMER_LABELS } from '../types';
 import { STORAGE_KEY } from '../types';
 import type { CountdownStyle, TaskItem, ProgressItem, PersistedState, TimerStatus } from '../types';
 
@@ -26,6 +26,7 @@ export function usePersistedState(options: UsePersistedStateOptions = {}) {
   const [elapsedMs, setElapsedMs] = useState(DEFAULT_STATE.elapsedMs);
   const [lastStartedAt, setLastStartedAt] = useState<number | null>(DEFAULT_STATE.lastStartedAt);
   const [autostart, setAutostartState] = useState(false);
+  const [timerLabels, setTimerLabelsState] = useState<string[]>(DEFAULT_TIMER_LABELS);
   const [isHydrated, setIsHydrated] = useState(false);
   // Debounce timer ref for persisting state
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -47,6 +48,7 @@ export function usePersistedState(options: UsePersistedStateOptions = {}) {
     setTimerStatus(persisted.timerStatus);
     setElapsedMs(persisted.elapsedMs);
     setLastStartedAt(persisted.lastStartedAt);
+    setTimerLabelsState(persisted.timerLabels ?? DEFAULT_TIMER_LABELS);
   };
 
   useEffect(() => {
@@ -111,6 +113,7 @@ export function usePersistedState(options: UsePersistedStateOptions = {}) {
         timerStatus,
         elapsedMs,
         lastStartedAt,
+        timerLabels,
       });
     }, 500);
 
@@ -129,6 +132,7 @@ export function usePersistedState(options: UsePersistedStateOptions = {}) {
     targetDate,
     targetTitle,
     tasks,
+    timerLabels,
     timerStatus,
     widgetOpacity,
     widgetWidth,
@@ -269,6 +273,11 @@ export function usePersistedState(options: UsePersistedStateOptions = {}) {
     if (persistMode === 'settings') persistSettingsPatch({ accentColor: color });
   };
 
+  const updateTimerLabels = (labels: string[]) => {
+    setTimerLabelsState(labels);
+    if (persistMode === 'settings') persistSettingsPatch({ timerLabels: labels });
+  };
+
   const selectActivityTag = (tag: string) => {
     setActivityTag(tag);
     if (tag.trim()) {
@@ -326,6 +335,7 @@ export function usePersistedState(options: UsePersistedStateOptions = {}) {
     elapsedMs,
     lastStartedAt,
     autostart, toggleAutostart,
+    timerLabels, setTimerLabels: updateTimerLabels,
     selectActivityTag,
     startOrResumeTimer,
     pauseTimer,

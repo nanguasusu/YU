@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
+import type React from 'react';
 import { Clock } from 'lucide-react';
 import { motion } from 'motion/react';
 import { buildDateFromInput, formatDateInput, DEFAULT_TARGET_TITLE } from '../types';
 import type { CountdownStyle } from '../types';
 
 interface TimerTabProps {
+  key?: React.Key;
   targetTitle: string;
   setTargetTitle: (title: string) => void;
   targetDate: Date;

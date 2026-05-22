@@ -8,6 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rimraf dist",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "lint": "tsc --noEmit",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build"
@@ -25,8 +27,11 @@
     "@tauri-apps/cli": "^2.11.2",
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.4",
+    "@vitest/coverage-v8": "^4.1.7",
+    "fast-check": "^4.8.0",
     "tailwindcss": "^4.1.14",
     "typescript": "~5.8.2",
-    "vite": "^6.2.3"
+    "vite": "^6.2.3",
+    "vitest": "^4.1.7"
   }
 }

@@ -1,6 +1,8 @@
 use tauri_plugin_autostart::MacosLauncher;
 use tauri::Manager;
+use tauri::Emitter;
 use tauri_plugin_store::StoreExt;
+use std::sync::Mutex;
 
 const STORE_FILE: &str = "app-state.json";
 const MAIN_WINDOW_LABEL: &str = "main";
@@ -9,6 +11,15 @@ const MAIN_WINDOW_BOUNDS_KEY: &str = "window-bounds";
 const MAIN_WINDOW_POSITION_KEY: &str = "window-position";
 const SETTINGS_WINDOW_BOUNDS_KEY: &str = "settings-window-bounds";
 const SETTINGS_WINDOW_POSITION_KEY: &str = "settings-window-position";
+
+/// Shared app-level state for tray menu rebuilding
+#[derive(Default)]
+struct AppState {
+  /// Current app mode: "widget" or "timer"
+  app_mode: String,
+  /// Whether the main window is currently visible
+  window_visible: bool,
+}
 
 #[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
 struct WindowBounds {
@@ -335,11 +346,63 @@ fn trim_memory() {
   }
 }
 
+#[tauri::command]
+fn set_app_mode(app: tauri::AppHandle, mode: String) {
+    // Update shared state
+    if let Some(state) = app.try_state::<Mutex<AppState>>() {
+        if let Ok(mut s) = state.lock() {
+            s.app_mode = mode.clone();
+        }
+        rebuild_tray_menu(&app);
+    }
+    app.emit("app-mode-changed", mode).ok();
+}
+
+/// Build the tray menu based on current AppState.
+#[cfg(desktop)]
+fn rebuild_tray_menu(app: &tauri::AppHandle) {
+    use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
+
+    let (window_visible, app_mode) = if let Some(state) = app.try_state::<Mutex<AppState>>() {
+        if let Ok(s) = state.lock() {
+            (s.window_visible, s.app_mode.clone())
+        } else {
+            (true, "widget".to_string())
+        }
+    } else {
+        (true, "widget".to_string())
+    };
+
+    let toggle_label = if window_visible { "隐藏悬浮窗" } else { "显示悬浮窗" };
+    let switch_label = if app_mode == "timer" { "切换到桌面挂件" } else { "切换到计时钟" };
+    let switch_id = if app_mode == "timer" { "switch-to-widget" } else { "switch-to-timer" };
+
+    let Ok(toggle) = MenuItem::with_id(app, "toggle-window", toggle_label, true, None::<&str>) else { return; };
+    let Ok(sep1) = PredefinedMenuItem::separator(app) else { return; };
+    let Ok(switch) = MenuItem::with_id(app, switch_id, switch_label, true, None::<&str>) else { return; };
+    let Ok(sep2) = PredefinedMenuItem::separator(app) else { return; };
+    let Ok(settings) = MenuItem::with_id(app, "settings", "设置", true, None::<&str>) else { return; };
+    let Ok(quit) = MenuItem::with_id(app, "quit", "退出", true, None::<&str>) else { return; };
+
+    let Ok(menu) = Menu::with_items(app, &[&toggle, &sep1, &switch, &sep2, &settings, &quit]) else { return; };
+
+    if let Some(tray) = app.tray_by_id("main-tray") {
+        let _ = tray.set_menu(Some(menu));
+    }
+}
+
+#[cfg(not(desktop))]
+fn rebuild_tray_menu(_app: &tauri::AppHandle) {}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
     .plugin(tauri_plugin_store::Builder::new().build())
     .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
+    .manage(Mutex::new(AppState {
+      app_mode: "widget".to_string(),
+      window_visible: true,
+    }))
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(
@@ -347,6 +410,21 @@ pub fn run() {
             .level(log::LevelFilter::Info)
             .build(),
         )?;
+      }
+
+      // Load persisted app-mode so tray reflects the correct mode on startup
+      if let Ok(store) = app.store(STORE_FILE) {
+        if let Some(val) = store.get("app-mode") {
+          if let Some(mode_str) = val.as_str() {
+            if mode_str == "widget" || mode_str == "timer" {
+              if let Some(state) = app.try_state::<Mutex<AppState>>() {
+                if let Ok(mut s) = state.lock() {
+                  s.app_mode = mode_str.to_string();
+                }
+              }
+            }
+          }
+        }
       }
 
       #[cfg(desktop)]
@@ -360,11 +438,23 @@ pub fn run() {
           restore_window_bounds(app.handle(), &window);
         }
 
-        let show = MenuItem::with_id(app, "show", "显示组件", true, None::<&str>)?;
-        let settings = MenuItem::with_id(app, "settings", "打开设置", true, None::<&str>)?;
+        // Build initial tray menu
+        let app_mode = if let Some(state) = app.try_state::<Mutex<AppState>>() {
+          state.lock().map(|s| s.app_mode.clone()).unwrap_or_else(|_| "widget".to_string())
+        } else {
+          "widget".to_string()
+        };
+
+        let switch_label = if app_mode == "timer" { "切换到桌面挂件" } else { "切换到计时钟" };
+        let switch_id = if app_mode == "timer" { "switch-to-widget" } else { "switch-to-timer" };
+
+        let toggle = MenuItem::with_id(app, "toggle-window", "隐藏悬浮窗", true, None::<&str>)?;
+        let sep1 = PredefinedMenuItem::separator(app)?;
+        let switch = MenuItem::with_id(app, switch_id, switch_label, true, None::<&str>)?;
+        let sep2 = PredefinedMenuItem::separator(app)?;
+        let settings = MenuItem::with_id(app, "settings", "设置", true, None::<&str>)?;
         let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
-        let separator = PredefinedMenuItem::separator(app)?;
-        let menu = Menu::with_items(app, &[&show, &settings, &separator, &quit])?;
+        let menu = Menu::with_items(app, &[&toggle, &sep1, &switch, &sep2, &settings, &quit])?;
         let icon = app.default_window_icon().cloned().unwrap();
 
         TrayIconBuilder::with_id("main-tray")
@@ -373,7 +463,49 @@ pub fn run() {
           .menu(&menu)
           .show_menu_on_left_click(false)
           .on_menu_event(|app, event| match event.id().as_ref() {
-            "show" => show_main_window(app),
+            "toggle-window" => {
+              let visible = if let Some(state) = app.try_state::<Mutex<AppState>>() {
+                state.lock().map(|s| s.window_visible).unwrap_or(true)
+              } else {
+                true
+              };
+              if visible {
+                if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
+                  let _ = window.hide();
+                }
+                if let Some(state) = app.try_state::<Mutex<AppState>>() {
+                  if let Ok(mut s) = state.lock() { s.window_visible = false; }
+                }
+              } else {
+                show_main_window(app);
+                if let Some(state) = app.try_state::<Mutex<AppState>>() {
+                  if let Ok(mut s) = state.lock() { s.window_visible = true; }
+                }
+              }
+              rebuild_tray_menu(app);
+            },
+            "switch-to-widget" => {
+              if let Some(state) = app.try_state::<Mutex<AppState>>() {
+                if let Ok(mut s) = state.lock() { s.app_mode = "widget".to_string(); }
+              }
+              app.emit("app-mode-changed", "widget").ok();
+              show_main_window(app);
+              if let Some(state) = app.try_state::<Mutex<AppState>>() {
+                if let Ok(mut s) = state.lock() { s.window_visible = true; }
+              }
+              rebuild_tray_menu(app);
+            },
+            "switch-to-timer" => {
+              if let Some(state) = app.try_state::<Mutex<AppState>>() {
+                if let Ok(mut s) = state.lock() { s.app_mode = "timer".to_string(); }
+              }
+              app.emit("app-mode-changed", "timer").ok();
+              show_main_window(app);
+              if let Some(state) = app.try_state::<Mutex<AppState>>() {
+                if let Ok(mut s) = state.lock() { s.window_visible = true; }
+              }
+              rebuild_tray_menu(app);
+            },
             "settings" => show_settings_window(app),
             "quit" => {
               if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
@@ -393,7 +525,23 @@ pub fn run() {
               ..
             } = event
             {
-              show_main_window(tray.app_handle());
+              let app = tray.app_handle();
+              let visible = if let Some(state) = app.try_state::<Mutex<AppState>>() {
+                state.lock().map(|s| s.window_visible).unwrap_or(true)
+              } else {
+                true
+              };
+              if visible {
+                if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
+                  let _ = window.set_focus();
+                }
+              } else {
+                show_main_window(app);
+                if let Some(state) = app.try_state::<Mutex<AppState>>() {
+                  if let Ok(mut s) = state.lock() { s.window_visible = true; }
+                }
+                rebuild_tray_menu(app);
+              }
             }
           })
           .build(app)?;
@@ -413,6 +561,12 @@ pub fn run() {
           if window.label() == MAIN_WINDOW_LABEL {
             api.prevent_close();
             let _ = window.hide();
+            // Update shared state and rebuild tray
+            let app = window.app_handle();
+            if let Some(state) = app.try_state::<Mutex<AppState>>() {
+              if let Ok(mut s) = state.lock() { s.window_visible = false; }
+            }
+            rebuild_tray_menu(app);
           }
         }
         _ => {}
@@ -421,7 +575,8 @@ pub fn run() {
     .invoke_handler(tauri::generate_handler![
       get_autostart,
       set_autostart,
-      trim_memory
+      trim_memory,
+      set_app_mode,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

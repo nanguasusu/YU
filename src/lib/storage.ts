@@ -6,6 +6,7 @@ import {
   ACCENT_COLORS,
   DEFAULT_STATE,
   DEFAULT_OPACITY,
+  DEFAULT_TIMER_LABELS,
   defaultTasks,
   defaultProgressItems,
   getDefaultTargetDate,
@@ -88,6 +89,10 @@ const normalizeState = (parsed: LegacyPersistedState): PersistedState => {
       typeof parsed.lastStartedAt === 'number' && Number.isFinite(parsed.lastStartedAt)
         ? parsed.lastStartedAt
         : null,
+    timerLabels:
+      Array.isArray(parsed.timerLabels) && parsed.timerLabels.length > 0
+        ? parsed.timerLabels.filter((l): l is string => typeof l === 'string' && l.trim().length > 0)
+        : DEFAULT_TIMER_LABELS,
   };
 };
 
