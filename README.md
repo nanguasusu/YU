@@ -1,6 +1,10 @@
 # 屿时钟
 
-**[English](./README_EN.md)** | 简体中文
+<p align="center">
+  <a href="./README_EN.md" style="text-decoration: none; padding: 4px 12px; border-radius: 6px; background-color: #f0f0f0; color: #555; font-size: 14px;">English</a>
+  &nbsp;
+  <b style="padding: 4px 12px; border-radius: 6px; background-color: #4FC7CF; color: #fff; font-size: 14px;">简体中文</b>
+</p>
 
 一个轻量、柔和、可自定义的桌面悬浮小组件。
 
@@ -136,6 +140,7 @@
 - [React 19](https://react.dev/) — 前端 UI 框架
 - [Vite](https://vite.dev/) — 构建工具
 - [TypeScript](https://www.typescriptlang.org/) — 类型安全
+- 样式方案：按项目实际情况填写（例如 Tailwind CSS / UnoCSS / CSS Modules 等）
 
 ---
 
