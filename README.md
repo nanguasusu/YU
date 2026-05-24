@@ -1,5 +1,7 @@
 # 屿时钟
 
+**[English](./README_EN.md)** | 简体中文
+
 一个轻量、柔和、可自定义的桌面悬浮小组件。
 
 屿时钟支持 **桌面挂件模式** 和 **计时钟模式**：既可以把重要目标、待办任务和进度放在桌面上，也可以记录学习、编程、阅读、休息等时间，生成今日时间线与统计。
@@ -12,13 +14,13 @@
   <img src="https://img.shields.io/badge/version-1.0.0-4FC7CF?style=flat" alt="version" />
   <img src="https://img.shields.io/badge/license-MIT-36C26B?style=flat" alt="license" />
   <img src="https://img.shields.io/badge/Tauri-2.0-FFC857?style=flat" alt="Tauri" />
-  <img src="https://img.shields.io/badge/Vue-3.5-42B883?style=flat" alt="Vue" />
+  <img src="https://img.shields.io/badge/React-19-61DAFB?style=flat" alt="React" />
 </p>
 
 ---
+
 ## 预览
 
-双模式 右上角点击图标切换
 ### 桌面挂件模式
 
 把重要目标、待办任务和进度条轻轻放在桌面上，像一个安静的提醒面板。
@@ -61,7 +63,7 @@
 
 ### 进度条
 
-用进度条追踪论文、项目、学习计划等长期目标。左键增加 右键减少
+用进度条追踪论文、项目、学习计划等长期目标。
 
 <p align="center">
   <img src="https://img.nanguasu.cc/2026/05/7ba9aa682a35a7285d7408c3bf871644.webp" alt="进度条" />
@@ -130,9 +132,10 @@
 
 ## 技术栈
 
-- [Tauri](https://tauri.app/)
-- 前端框架：Vue 3.5
-- 
+- [Tauri 2.0](https://tauri.app/) — 轻量跨端桌面框架
+- [React 19](https://react.dev/) — 前端 UI 框架
+- [Vite](https://vite.dev/) — 构建工具
+- [TypeScript](https://www.typescriptlang.org/) — 类型安全
 
 ---
 
@@ -164,18 +167,4 @@
 
 ## License
 
-MIT License
-
-Copyright (c) 2026-present 屿时钟
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF AN
+[MIT License](./LICENSE)
