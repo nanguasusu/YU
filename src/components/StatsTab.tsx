@@ -1,9 +1,11 @@
 import { Plus, X } from 'lucide-react';
+import type React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { getProgressTone } from '../types';
 import type { ProgressItem } from '../types';
 
 interface StatsTabProps {
+  key?: React.Key;
   progressItems: ProgressItem[];
   onAdd: () => void;
   onDelete: (id: number) => void;

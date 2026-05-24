@@ -1,4 +1,5 @@
 .app-wrapper {
+  height: 100vh;
   min-height: 100vh;
   display: flex;
   align-items: flex-start;
@@ -6,6 +7,19 @@
   padding: 0;
   background: transparent;
   font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  overflow: hidden;
+}
+
+.settings-window-wrapper {
+  align-items: stretch;
+}
+
+.settings-window-browser {
+  min-height: 100vh;
+  padding: 1rem;
+  background:
+    radial-gradient(circle at top, rgba(255, 216, 228, 0.72), rgba(255, 244, 247, 0.96) 55%),
+    #fff6f8;
 }
 
 .widget-container {
@@ -24,14 +38,110 @@
   transition: max-height 0.5s ease-in-out, transform 0.5s ease-in-out;
 }
 
+.settings-window-shell {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08), inset 0 1px 1px rgba(255, 255, 255, 0.7);
+  border-radius: 32px;
+  overflow: hidden;
+}
+
+.settings-window-browser .settings-window-shell {
+  max-width: 420px;
+  min-height: min(560px, calc(100vh - 2rem));
+  margin: 0 auto;
+  border-radius: 32px;
+  overflow: hidden;
+}
+
+.settings-window-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1rem 0.75rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.settings-window-dragzone {
+  cursor: grab;
+  user-select: none;
+}
+
+.settings-window-dragzone:active {
+  cursor: grabbing;
+}
+
+.settings-window-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.settings-window-title-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.settings-window-kicker {
+  font-size: 12px;
+  color: #86868b;
+  line-height: 1.2;
+}
+
+.settings-window-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 16px;
+  font-weight: 650;
+  color: #1d1d1f;
+  line-height: 1.2;
+}
+
+.settings-window-heading-icon {
+  width: 15px;
+  height: 15px;
+  color: #86868b;
+}
+
+.settings-window-close {
+  position: relative;
+  z-index: 2;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.45);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.55);
+  flex-shrink: 0;
+}
+
+.settings-window-content {
+  flex: 1;
+  min-height: 0;
+  padding: 1rem;
+  overflow: hidden;
+}
+
 .widget-minimized {
-  max-height: 60px;
-  transform: scale(0.95);
+  max-height: 184px;
+  transform: scale(0.97);
+  border-radius: 34px;
 }
 
 .widget-expanded {
-  max-height: 640px;
-  min-height: 320px;
+  max-height: 560px;
+  min-height: 260px;
   transform: scale(1);
 }
 
@@ -69,11 +179,11 @@
 }
 
 .top-bar-minimized {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 40px;
-  align-items: center;
-  padding: 0.28rem 0.55rem;
-  gap: 0.2rem;
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  padding: 0.62rem 0.72rem 0.58rem;
 }
 
 .mini-info {
@@ -82,7 +192,7 @@
   justify-content: center;
   flex: 1;
   min-width: 0;
-  min-height: 36px;
+  min-height: 122px;
   padding: 0;
   border-radius: 0;
   background: transparent;
@@ -143,6 +253,89 @@
   align-self: center;
 }
 
+.mini-timer-shell {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 0.56rem;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  padding: 0.36rem 0.68rem 0.6rem;
+  border-radius: 30px;
+  /* 完全透明 — 玻璃感由外层 widget-container 的 backdrop-filter 统一提供 */
+  background: transparent;
+}
+
+.mini-timer-head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.32rem;
+  min-width: 0;
+}
+
+.mini-tag-picker {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  padding-right: 12px;
+  flex-shrink: 0;
+}
+
+.mini-tag-select {
+  appearance: none;
+  -webkit-appearance: none;
+  border: none;
+  background: transparent;
+  color: #7c7f89;
+  font-size: 13px;
+  font-weight: 700;
+  min-width: 0;
+  padding: 0;
+  outline: none;
+  cursor: pointer;
+  text-align: center;
+}
+
+.mini-tag-select option {
+  color: #1d1d1f;
+}
+
+.mini-tag-chevron {
+  position: absolute;
+  right: 0;
+  width: 11px;
+  height: 11px;
+  color: rgba(124, 127, 137, 0.76);
+  pointer-events: none;
+}
+
+.mini-timer-display {
+  min-width: 0;
+  border: none;
+  background: transparent;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.48rem;
+}
+
+.mini-timer-status {
+  max-width: 100%;
+  font-size: 13px;
+  line-height: 1.2;
+  color: #7c7f89;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .mini-info-title {
   min-width: 0;
   overflow: hidden;
@@ -166,15 +359,19 @@
 
 .mini-time-text {
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", ui-monospace, monospace;
-  font-size: 52px;
-  font-weight: 500;
-  letter-spacing: -1.2px;
+  font-size: 48px;
+  font-weight: 700;
+  letter-spacing: -2px;
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
   text-align: center;
   height: 100%;
-  min-height: 36px;
+  min-height: 44px;
   line-height: 1;
+}
+
+.mini-timer-hint {
+  display: none;
 }
 
 .mini-time-text .mini-info-status {
@@ -198,24 +395,31 @@
 }
 
 .top-bar-minimized .top-actions {
-  width: 40px;
-  gap: 0.38rem;
-  align-self: center;
+  position: absolute;
+  top: 0.72rem;
+  right: 0.72rem;
+  width: auto;
+  gap: 0;
+  align-self: auto;
   justify-content: center;
+  z-index: 2;
 }
 
 .top-bar-minimized .icon-button {
-  width: 28px;
-  height: 28px;
+  width: 22px;
+  height: 22px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.45);
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.55);
+  background: transparent;
+  box-shadow: none;
   flex-shrink: 0;
+  margin-top: 0;
+  color: rgba(124, 127, 137, 0.78);
 }
 
 .mini-drag-zone {
   min-width: 0;
-  justify-self: stretch;
+  width: 100%;
+  justify-content: center;
 }
 
 .top-bar-minimized .action-icon:hover {
@@ -290,6 +494,7 @@
 .content-hidden {
   opacity: 0;
   pointer-events: none;
+  display: none;
 }
 
 .tab-header {
@@ -298,7 +503,7 @@
   color: #86868b;
   font-weight: 500;
   font-size: 15px;
-  margin-bottom: 1.25rem;
+  margin-bottom: 0.75rem;
   letter-spacing: 0.5px;
 }
 
@@ -353,8 +558,140 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  flex-grow: 1;
-  padding: 0.25rem 0 1.25rem 0;
+  padding: 0.5rem 0 0.75rem 0;
+  gap: 0.5rem;
+}
+
+.timer-panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.timer-tag-row {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.timer-tag-label {
+  color: #86868b;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.timer-tag-select {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.42);
+  color: #1d1d1f;
+  border-radius: 14px;
+  padding: 0.8rem 1rem;
+  font-size: 15px;
+  outline: none;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.4);
+}
+
+.timer-tag-select:focus {
+  border-color: rgba(0, 122, 255, 0.28);
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.timer-hero {
+  width: 100%;
+  border: none;
+  border-radius: 28px;
+  padding: 1.35rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.35));
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.55), 0 12px 28px rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+}
+
+.timer-hero:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.55), 0 16px 32px rgba(0, 0, 0, 0.07);
+}
+
+.timer-hero:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.timer-hero-status {
+  color: #86868b;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.timer-hero-time {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", ui-monospace, monospace;
+  font-size: 56px;
+  font-weight: 600;
+  letter-spacing: -1px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+.timer-hero-hint {
+  color: #6e6e73;
+  font-size: 12px;
+}
+
+.timer-helper-card {
+  width: 100%;
+  padding: 1rem 1.05rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.timer-helper-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  color: #86868b;
+  font-size: 13px;
+}
+
+.timer-helper-line strong {
+  color: #1d1d1f;
+  font-size: 13px;
+  text-align: right;
+}
+
+.timer-reset-btn {
+  align-self: flex-end;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: none;
+  background: transparent;
+  color: #86868b;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.timer-reset-btn:hover {
+  color: #1d1d1f;
+}
+
+.timer-reset-icon {
+  width: 14px;
+  height: 14px;
 }
 
 .timer-container {
@@ -362,22 +699,15 @@
   align-items: baseline;
   gap: 8px;
   color: #1d1d1f;
-  margin-bottom: 1rem;
+  margin-bottom: 0.25rem;
   font-variant-numeric: tabular-nums;
-  transition: font-family 0.3s;
 }
-
-.timer-font-sans { font-family: sans-serif; }
-.timer-font-serif { font-family: 'Playfair Display', Georgia, serif; }
-.timer-font-mono { font-family: 'Special Elite', 'Courier New', cursive; }
 
 .timer-number {
+  font-size: 78px;
   letter-spacing: -0.5px;
+  /* font-family and weight come from mini-time-font-* class */
 }
-
-.timer-number-sans { font-size: 78px; font-weight: bold; }
-.timer-number-serif { font-size: 84px; font-weight: 500; }
-.timer-number-mono { font-size: 72px; font-weight: bold; }
 
 .timer-label {
   font-size: 20px;
@@ -653,6 +983,8 @@
   max-height: 230px;
   overflow-y: auto;
   padding-right: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(134, 134, 139, 0.28) transparent;
 }
 
 .progress-list-scroll::-webkit-scrollbar {
@@ -1076,7 +1408,7 @@ input:focus-visible {
   }
 
   .widget-minimized {
-    max-height: 64px;
+    max-height: 176px;
   }
 
   .content-area {
@@ -1134,11 +1466,11 @@ input:focus-visible {
   }
 
   .top-bar-minimized {
-    padding: 0.32rem 0.55rem;
+    padding: 0.56rem 0.62rem 0.54rem;
   }
 
   .mini-info {
-    min-height: 38px;
+    min-height: 116px;
     padding: 0;
   }
 
@@ -1158,9 +1490,28 @@ input:focus-visible {
     font-size: 24px;
   }
 
+  .mini-timer-shell {
+    gap: 0.5rem;
+    padding: 0.32rem 0.58rem 0.52rem;
+  }
+
+  .mini-tag-select {
+    font-size: 12px;
+  }
+
   .mini-time-text {
-    font-size: 42px;
-    letter-spacing: -1px;
+    font-size: 40px;
+    font-weight: 700;
+    letter-spacing: -1.1px;
+  }
+
+  .mini-timer-status {
+    font-size: 12px;
+  }
+
+  .top-bar-minimized .top-actions {
+    top: 0.62rem;
+    right: 0.62rem;
   }
 
 }
@@ -1203,6 +1554,120 @@ input:focus-visible {
   /* Removed infinite animation — it was the main cause of continuous GPU usage */
 }
 
+/* ── Brand icon as clickable button ── */
+.brand-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: opacity 0.15s, transform 0.15s;
+  pointer-events: auto;
+  outline: none;
+}
+
+.brand-icon-btn:hover {
+  opacity: 0.8;
+  transform: scale(1.08);
+}
+
+.brand-icon-btn:active {
+  transform: scale(0.96);
+}
+
+/* ── Mode switch menu wrapper ── */
+.brand-icon-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* Transparent full-screen backdrop — closes menu on outside click */
+.mode-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 99;
+  background: transparent;
+}
+
+/* ── Mode menu popup ── */
+.mode-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 100;
+  min-width: 160px;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.06);
+  padding: 6px;
+  user-select: none;
+}
+
+.mode-menu-current {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 8px;
+}
+
+.mode-menu-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.mode-menu-current-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1d1d1f;
+  flex: 1;
+}
+
+.mode-menu-badge {
+  font-size: 11px;
+  color: #86868b;
+  font-weight: 500;
+}
+
+.mode-menu-divider {
+  height: 1px;
+  background: rgba(0, 0, 0, 0.06);
+  margin: 4px 2px;
+}
+
+.mode-menu-switch {
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #1d1d1f;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s;
+  outline: none;
+}
+
+.mode-menu-switch:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.mode-menu-switch:active {
+  background: rgba(0, 0, 0, 0.09);
+}
+
 /* ── Settings tab scrollable area ── */
 .settings-scroll {
   height: 100%;
@@ -1230,25 +1695,23 @@ input:focus-visible {
   flex-direction: column;
 }
 
+.settings-window-content .settings-motion {
+  height: 100%;
+}
+
 /* ── Settings scroll container ── */
 .settings-scroll {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   padding-right: 4px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 .settings-scroll::-webkit-scrollbar {
-  width: 6px;
-}
-
-.settings-scroll::-webkit-scrollbar-thumb {
-  background: rgba(134, 134, 139, 0.28);
-  border-radius: 999px;
-}
-
-.settings-scroll::-webkit-scrollbar-track {
-  background: transparent;
+  width: 0;
+  height: 0;
 }
 
 /* ── Two-column slider row ── */
@@ -1357,4 +1820,1054 @@ input:focus-visible {
 .settings-item-col .opacity-slider {
   flex: 1;
   min-width: 0;
+}
+
+
+/* ── TagPicker Component ── */
+.tag-picker-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+.tag-picker-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border: none;
+  background: transparent;
+  color: #7c7f89;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 0;
+  cursor: pointer;
+  outline: none;
+  min-width: 0;
+}
+
+.tag-picker-trigger:hover {
+  color: #1d1d1f;
+}
+
+.tag-picker-trigger-disabled,
+.tag-picker-trigger-disabled:hover {
+  cursor: default;
+  color: #7c7f89;
+  opacity: 1;
+}
+
+.tag-picker-value {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 80px;
+}
+
+.tag-picker-chevron {
+  width: 11px;
+  height: 11px;
+  color: rgba(124, 127, 137, 0.76);
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.tag-picker-chevron-open {
+  transform: rotate(180deg);
+}
+
+.tag-picker-dropdown {
+  position: fixed;
+  min-width: 120px;
+  max-width: 180px;
+  max-height: 240px;
+  overflow-y: auto;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.06);
+  padding: 4px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+}
+
+.tag-picker-dropdown::-webkit-scrollbar {
+  width: 4px;
+}
+
+.tag-picker-dropdown::-webkit-scrollbar-thumb {
+  background: rgba(134, 134, 139, 0.25);
+  border-radius: 999px;
+}
+
+.tag-picker-dropdown::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tag-picker-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.tag-picker-section-custom {
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  margin-top: 2px;
+  padding-top: 2px;
+}
+
+.tag-picker-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: #1d1d1f;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  outline: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background-color 0.15s;
+}
+
+.tag-picker-item:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.tag-picker-item-active {
+  font-weight: 700;
+}
+
+.tag-picker-item-disabled {
+  color: #86868b;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.tag-picker-item-disabled:hover {
+  background: transparent;
+}
+
+.tag-picker-more {
+  color: #86868b;
+  font-weight: 500;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  margin-top: 2px;
+  padding-top: 8px;
+}
+
+.tag-picker-custom-btn {
+  color: #007aff;
+  font-weight: 600;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  margin-top: 2px;
+  padding-top: 8px;
+}
+
+.tag-picker-input-wrap {
+  padding: 4px 6px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  margin-top: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tag-picker-input {
+  width: 100%;
+  border: 1px solid rgba(0, 122, 255, 0.3);
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 12px;
+  color: #1d1d1f;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.tag-picker-input:focus {
+  border-color: rgba(0, 122, 255, 0.5);
+  box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.1);
+}
+
+.tag-picker-input::placeholder {
+  color: #86868b;
+}
+
+.tag-picker-error {
+  font-size: 11px;
+  color: #ff453a;
+  line-height: 1.2;
+}
+
+.tag-picker-delete-error {
+  position: absolute;
+  bottom: -28px;
+  left: 0;
+  right: 0;
+  font-size: 11px;
+  color: #ff453a;
+  background: rgba(255, 69, 58, 0.08);
+  border-radius: 6px;
+  padding: 4px 8px;
+  text-align: center;
+  line-height: 1.2;
+  pointer-events: none;
+}
+
+
+/* ── Delete Confirm Popover ── */
+.delete-confirm-popover {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 14px;
+  padding: 12px 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 140px;
+}
+
+.delete-confirm-text {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1d1d1f;
+  white-space: nowrap;
+}
+
+.delete-confirm-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.delete-confirm-btn {
+  flex: 1;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s, transform 0.1s;
+  outline: none;
+}
+
+.delete-confirm-btn:active {
+  transform: scale(0.96);
+}
+
+.delete-confirm-btn-danger {
+  background: #ff453a;
+  color: #fff;
+}
+
+.delete-confirm-btn-danger:hover {
+  background: #e63b31;
+}
+
+.delete-confirm-btn-cancel {
+  background: rgba(0, 0, 0, 0.06);
+  color: #1d1d1f;
+}
+
+.delete-confirm-btn-cancel:hover {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+
+/* ── Record Error Toast ── */
+.record-error-toast {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  background: rgba(255, 69, 58, 0.92);
+  color: #fff;
+  padding: 0.6rem 1.2rem;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 4px 16px rgba(255, 69, 58, 0.28);
+  pointer-events: none;
+  white-space: nowrap;
+  animation: toast-fade-in 0.2s ease-out;
+}
+
+@keyframes toast-fade-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+
+/* ── Timer Start Page (tsp) ── */
+.tsp-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  flex-grow: 1;
+  padding: 0.25rem 0 1.25rem;
+}
+
+/* Tag picker row — centered, same style as the tab-header line */
+.tsp-tag-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+/* Override TagPicker trigger to look like the countdown's inline title button */
+.tsp-tag-row .tag-picker-trigger {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1d1d1f;
+  gap: 4px;
+}
+
+.tsp-tag-row .tag-picker-value {
+  max-width: 140px;
+}
+
+.tsp-tag-row .tag-picker-chevron {
+  width: 13px;
+  height: 13px;
+  color: #86868b;
+}
+
+/* Central time block — no card, number floats freely */
+.tsp-time-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.tsp-time {
+  font-size: 52px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  /* font-family and weight come from mini-time-font-* class */
+  /* color set via inline style (accentColor) */
+}
+
+.tsp-status {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #86868b;
+  letter-spacing: 0.3px;
+}
+
+.tsp-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  /* background-color set via inline style (accentColor) */
+}
+
+/* Action row — three balanced buttons */
+.tsp-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+}
+
+/* Ghost side buttons: 重置 / 结束 */
+.tsp-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 40px;
+  min-height: 36px;
+  min-width: 60px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.5);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.55);
+  color: #86868b;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+  white-space: nowrap;
+}
+
+.tsp-btn-ghost:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.75);
+  color: #1d1d1f;
+}
+
+.tsp-btn-ghost:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Primary center button: 开始 / 暂停 / 继续 */
+.tsp-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  min-height: 36px;
+  min-width: 72px;
+  padding: 8px 20px;
+  /* background-color set via inline style (accentColor) */
+  color: #ffffff;
+  border: none;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.2s, opacity 0.2s;
+  white-space: nowrap;
+}
+
+.tsp-btn-primary:hover:not(:disabled) {
+  filter: brightness(0.88);
+}
+
+.tsp-btn-primary:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ── Timer Timeline Page (tl) ── */
+.tl-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.tl-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  flex-shrink: 0;
+}
+
+.tl-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #86868b;
+  letter-spacing: 0.04em;
+}
+
+.tl-count {
+  font-size: 12px;
+  color: #86868b;
+  font-weight: 500;
+}
+
+/* Wrapper holds the scroll area + custom scrollbar + fade masks */
+.tl-scroll-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.tl-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  /* Hide native scrollbar on all browsers */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  /* Give room for the custom 3px scrollbar on the right */
+  padding-right: 8px;
+}
+
+.tl-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Custom scrollbar ── */
+.tl-scrollbar-track {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  right: 0;
+  width: 3px;
+  border-radius: 999px;
+  /* No visible track background — fully invisible until thumb appears */
+  pointer-events: none;
+}
+
+.tl-scrollbar-thumb {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-radius: 999px;
+  background: rgba(134, 134, 139, 0.45);
+  transition: opacity 0.3s ease, background-color 0.2s ease;
+  pointer-events: none;
+  min-height: 20px;
+}
+
+/* Slightly more visible on hover of the wrapper */
+.tl-scroll-wrap:hover .tl-scrollbar-thumb {
+  background: rgba(134, 134, 139, 0.6);
+}
+
+/* ── Top / bottom fade masks ── */
+.tl-fade-top,
+.tl-fade-bottom {
+  position: absolute;
+  left: 0;
+  right: 8px; /* align with scroll area, not the scrollbar track */
+  height: 24px;
+  pointer-events: none;
+  z-index: 1;
+  transition: opacity 0.25s ease;
+}
+
+.tl-fade-top {
+  top: 0;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.85), transparent);
+}
+
+.tl-fade-bottom {
+  bottom: 0;
+  background: linear-gradient(to top, rgba(255, 255, 255, 0.85), transparent);
+}
+
+.tl-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 0;
+  color: #86868b;
+  font-size: 13px;
+}
+
+.tl-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.tl-item {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+}
+
+/* Left spine column */
+.tl-spine {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  width: 12px;
+  padding-top: 4px;
+}
+
+.tl-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.tl-line {
+  flex: 1;
+  width: 1px;
+  background: rgba(134, 134, 139, 0.2);
+  margin-top: 4px;
+  min-height: 12px;
+}
+
+/* Content column */
+.tl-content {
+  flex: 1;
+  min-width: 0;
+  padding-bottom: 0.5rem;
+}
+
+.tl-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 2px;
+}
+
+.tl-time-range {
+  font-size: 11px;
+  color: #86868b;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.tl-duration {
+  font-size: 11px;
+  color: #86868b;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.tl-item-title {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #1d1d1f;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tl-item-tag {
+  display: inline-block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: #86868b;
+  background: rgba(134, 134, 139, 0.1);
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+
+/* ── Timer Stats Page (ts) ── */
+.ts-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.ts-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 1.1rem;
+  flex-shrink: 0;
+}
+
+.ts-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1d1d1f;
+}
+
+.ts-total {
+  font-size: 13px;
+  color: #86868b;
+  font-weight: 400;
+}
+
+.ts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  flex: 1;
+  min-height: 0;
+}
+
+.ts-list::-webkit-scrollbar {
+  display: none;
+}
+
+.ts-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.ts-item-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.ts-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.ts-tag {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+  color: #1d1d1f;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ts-time {
+  font-size: 13px;
+  font-weight: 500;
+  color: #1d1d1f;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.ts-pct {
+  color: #86868b;
+  font-weight: 400;
+}
+
+.ts-bar-bg {
+  height: 4px;
+  background-color: rgba(0, 0, 0, 0.04);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.ts-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.5s ease-out;
+}
+
+.ts-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem 0;
+  color: #86868b;
+  font-size: 13px;
+  flex: 1;
+}
+
+/* ── Settings: section divider + label ── */
+.settings-section-divider {
+  height: 1px;
+  background: rgba(0, 0, 0, 0.06);
+  margin: 0.25rem 0;
+}
+
+.settings-section-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #86868b;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 0.1rem 0 0.25rem;
+}
+
+/* ── Settings: nav row (entry to sub-page) ── */
+.settings-nav-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.6rem 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.settings-nav-row:hover .settings-nav-row-label {
+  color: #007aff;
+}
+
+.settings-nav-row-label {
+  font-size: 15px;
+  color: #1d1d1f;
+  transition: color 0.15s;
+}
+
+.settings-nav-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: #86868b;
+}
+
+.settings-nav-row-chevron {
+  color: #c7c7cc;
+}
+
+/* ── Timer Labels sub-page (stl) ── */
+.stl-topbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  margin-bottom: 1rem;
+  flex-shrink: 0;
+}
+
+.stl-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border: none;
+  background: transparent;
+  color: #86868b;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.15s;
+}
+
+.stl-back-btn:hover {
+  color: #1d1d1f;
+}
+
+.stl-page-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1d1d1f;
+  flex: 1;
+  text-align: center;
+  /* offset for back button width so title appears visually centered */
+  margin-right: 40px;
+}
+
+.stl-label-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 1rem;
+}
+
+.stl-empty {
+  font-size: 13px;
+  color: #86868b;
+  padding: 0.5rem 0;
+}
+
+.stl-label-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.55rem 0.75rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+.stl-label-name {
+  font-size: 14px;
+  color: #1d1d1f;
+  font-weight: 500;
+}
+
+.stl-delete-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  color: #c7c7cc;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: color 0.15s, background-color 0.15s;
+  flex-shrink: 0;
+}
+
+.stl-delete-btn:hover {
+  color: #ff453a;
+  background: rgba(255, 69, 58, 0.08);
+}
+
+.stl-add-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 0.35rem;
+}
+
+.stl-add-input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 10px;
+  padding: 0.55rem 0.75rem;
+  font-size: 14px;
+  color: #1d1d1f;
+  outline: none;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.stl-add-input::placeholder {
+  color: #86868b;
+}
+
+.stl-add-input:focus {
+  border-color: rgba(0, 122, 255, 0.35);
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.stl-add-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background-color 0.15s, opacity 0.15s;
+  flex-shrink: 0;
+}
+
+.stl-add-btn:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.stl-add-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.stl-error {
+  font-size: 12px;
+  color: #ff453a;
+  padding: 0 0.25rem;
+}
+
+/* ── Mini timer font variants ─────────────────────────────────────────────── */
+
+/* 等宽（默认）：SFMono / Consolas 等宽字体，数字对齐感强 */
+.mini-time-font-mono {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", ui-monospace, monospace;
+  font-weight: 700;
+  letter-spacing: -2px;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* 数码：LCD 风格，Segment 感 */
+.mini-time-font-digital {
+  font-family: "Courier New", "Lucida Console", monospace;
+  font-weight: 900;
+  letter-spacing: 2px;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* 圆润：系统圆体，亲切感 */
+.mini-time-font-rounded {
+  font-family: ui-rounded, "SF Pro Rounded", "Hiragino Maru Gothic ProN", "Nunito", sans-serif;
+  font-weight: 700;
+  letter-spacing: -1px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 纤细：细线条，优雅感 */
+.mini-time-font-thin {
+  font-family: ui-sans-serif, "Helvetica Neue", Arial, sans-serif;
+  font-weight: 200;
+  letter-spacing: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 衬线：Serif 风格，古典感 */
+.mini-time-font-serif {
+  font-family: "Georgia", "Times New Roman", ui-serif, serif;
+  font-weight: 600;
+  letter-spacing: -1px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 黑体：无衬线粗体，现代感 */
+.mini-time-font-sans {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-weight: 800;
+  letter-spacing: -1.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Mini font picker in settings ─────────────────────────────────────────── */
+
+.mini-font-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.mini-font-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 4px 6px;
+  border-radius: 12px;
+  border: 1.5px solid rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  transition: border-color 0.18s, background-color 0.18s, transform 0.12s;
+  outline: none;
+}
+
+.mini-font-chip:hover {
+  background: rgba(255, 255, 255, 0.6);
+  transform: translateY(-1px);
+}
+
+.mini-font-chip-active {
+  background: rgba(255, 255, 255, 0.55);
+  border-width: 1.5px;
+}
+
+.mini-font-chip-inactive {
+  color: #86868b;
+}
+
+.mini-font-preview {
+  font-size: 15px;
+  line-height: 1;
+  color: inherit;
+  letter-spacing: inherit;
+}
+
+.mini-font-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #86868b;
+  letter-spacing: 0.03em;
+}
+
+.mini-font-chip-active .mini-font-label {
+  color: inherit;
 }

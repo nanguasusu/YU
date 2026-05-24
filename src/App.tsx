@@ -1,47 +1,102 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Clock, CheckSquare, BarChart2, Settings, Minimize2 } from 'lucide-react';
-import { AnimatePresence } from 'motion/react';
+import { Minimize2 } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
 import { usePersistedState } from './hooks/usePersistedState';
+import { useTagStore } from './hooks/useTagStore';
+import { useAppMode } from './hooks/useAppMode';
+import { useTimerRecords } from './hooks/useTimerRecords';
+import { useLiveElapsedMs } from './hooks/useLiveElapsedMs';
 import { playSound } from './lib/sound';
 import { BrandClockIcon } from './components/BrandClockIcon';
-import { TimerTab } from './components/TimerTab';
-import { TasksTab } from './components/TasksTab';
-import { StatsTab } from './components/StatsTab';
-import { SettingsTab } from './components/SettingsTab';
-import type { ActiveTab } from './types';
+import { ModeMenu } from './components/ModeMenu';
+import { TagPicker } from './components/TagPicker';
+import { WidgetLayout } from './components/WidgetLayout';
+import { TimerLayout } from './components/TimerLayout';
+import { formatElapsedTime } from './types';
+import type { AppMode, TimerStatus, WindowState, WidgetTab, TimerTab } from './types';
 import './App.css';
 
-/** Mini clock shown only when the widget is minimized */
-function MiniClock({ accentColor, title }: { accentColor: string; title: string }) {
-  const [now, setNow] = useState(new Date());
-  useEffect(() => {
-    const id = window.setInterval(() => setNow(new Date()), 1000);
-    return () => window.clearInterval(id);
-  }, []);
+const ALL_APP_MODES: AppMode[] = ['widget', 'timer'];
 
-  const text = [now.getHours(), now.getMinutes(), now.getSeconds()]
-    .map((p) => String(p).padStart(2, '0'))
-    .join(':');
+/**
+ * 根据 activityTag 和 timerStatus 返回唯一一条状态文案。
+ * 纯函数，无 React 依赖，便于测试。
+ */
+export function getStatusText(activityTag: string, timerStatus: TimerStatus): string {
+  const tag = activityTag.trim();
+
+  if (!tag) return '请选择标签';
+
+  switch (timerStatus) {
+    case 'running':
+      return ` 进行中`;
+    case 'paused':
+      return `已暂停`;
+    case 'idle':
+    default:
+      return `待开始`;
+  }
+}
+
+function MiniTimer({
+  accentColor,
+  activityTag,
+  timerStatus,
+  displayTime,
+  onSelectTag,
+  timerLabels,
+  miniTimerFont,
+}: {
+  accentColor: string;
+  activityTag: string;
+  timerStatus: TimerStatus;
+  displayTime: string;
+  onSelectTag: (tag: string) => void;
+  timerLabels: string[];
+  miniTimerFont: string;
+}) {
+  const statusText = getStatusText(activityTag, timerStatus);
 
   return (
-    <span
-      className="mini-info-text mini-time-text"
-      title={`${title} · ${text}`}
-      style={{ color: accentColor }}
-    >
-      {text}
-    </span>
+    <div className="mini-timer-shell">
+      <div className="mini-timer-head">
+        <TagPicker
+          currentTag={activityTag}
+          onSelectTag={onSelectTag}
+          accentColor={accentColor}
+          labels={timerLabels}
+          disabled
+        />
+        {activityTag.trim() && (
+          <span className="mini-timer-status">{statusText}</span>
+        )}
+      </div>
+
+      <div className="mini-timer-display">
+        <span
+          className={`mini-info-text mini-time-text mini-time-font-${miniTimerFont}`}
+          style={{ color: accentColor }}
+        >
+          {displayTime}
+        </span>
+      </div>
+    </div>
   );
 }
 
 export default function App() {
   const state = usePersistedState();
-  const [isMinimized, setIsMinimized] = useState(false);
-  const [activeTab, setActiveTab] = useState<ActiveTab>('timer');
+  const tagStore = useTagStore();
 
-  // ── Memory optimization: trim working set after 30s of mouse-away ─────────
+  // --- Task 11.1: New hooks and state ---
+  const { appMode, setAppMode } = useAppMode();
+  const { addRecord, getTodayRecords } = useTimerRecords();
+  const [windowState, setWindowState] = useState<WindowState>('full');
+  const [widgetTab, setWidgetTab] = useState<WidgetTab>('countdown');
+  const [timerTab, setTimerTab] = useState<TimerTab>('start');
+  const [modeMenuOpen, setModeMenuOpen] = useState(false);
+
   const trimTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleMouseLeave = useCallback(() => {
@@ -64,16 +119,71 @@ export default function App() {
     }
   }, []);
 
-  const changeTab = (tab: ActiveTab) => {
-    if (activeTab === tab) return;
-    playSound('click', state.isMuted);
-    setActiveTab(tab);
-  };
+  const liveElapsedMs = useLiveElapsedMs(state.timerStatus, state.elapsedMs, state.lastStartedAt);
 
-  const toggleMinimize = () => {
-    playSound(isMinimized ? 'unminimize' : 'minimize', state.isMuted);
-    setIsMinimized((v) => !v);
-  };
+  const timerDisplay = formatElapsedTime(liveElapsedMs);
+
+  const [recordError, setRecordError] = useState<string>('');
+
+  // Auto-clear error after 3 seconds
+  useEffect(() => {
+    if (!recordError) return undefined;
+    const id = setTimeout(() => setRecordError(''), 3000);
+    return () => clearTimeout(id);
+  }, [recordError]);
+
+  const flushCurrentSession = useCallback(async (): Promise<boolean> => {
+    // 不需要 flush 的情况
+    if (state.timerStatus !== 'running' || !state.activityTag.trim()) {
+      return true;
+    }
+
+    const now = Date.now();
+    const elapsed =
+      state.elapsedMs + Math.max(0, now - (state.lastStartedAt ?? now));
+
+    if (elapsed < 1000) return true;
+
+    const result = await tagStore.recordDuration(state.activityTag, elapsed);
+    if (!result.success) {
+      setRecordError('存储失败，计时数据未保存');
+      return false;
+    }
+    return true;
+  }, [state.timerStatus, state.activityTag, state.elapsedMs, state.lastStartedAt, tagStore]);
+
+  const handleSelectTag = useCallback(async (newTag: string) => {
+    const ok = await flushCurrentSession();
+    if (!ok) return;
+    if (newTag.trim()) void tagStore.touchTag(newTag);
+    state.selectActivityTag(newTag);
+  }, [flushCurrentSession, tagStore, state]);
+
+  const handleToggle = useCallback(async () => {
+    if (!state.activityTag.trim()) return;
+    if (state.timerStatus === 'running') {
+      const ok = await flushCurrentSession();
+      if (!ok) return;
+    }
+    state.toggleTimer();
+  }, [flushCurrentSession, state]);
+
+  const handleReset = useCallback(async () => {
+    const ok = await flushCurrentSession();
+    if (!ok) return;
+    state.resetTimer();
+  }, [flushCurrentSession, state]);
+
+  // --- Task 11.3: Updated minimize handler ---
+  const handleMinimize = useCallback(() => {
+    if (appMode === 'timer') {
+      playSound('minimize', state.isMuted);
+      setWindowState('mini');
+    } else {
+      playSound('minimize', state.isMuted);
+      void getCurrentWindow().hide();
+    }
+  }, [appMode, state.isMuted]);
 
   const tryStartResizeDrag = async () => {
     try { await getCurrentWindow().startResizeDragging('East'); } catch { /* non-Tauri */ }
@@ -89,10 +199,72 @@ export default function App() {
     void tryStartWindowDrag();
   };
 
+  // --- Task 6.1: Merge timerLabels with visibleCustomTags ---
+  const mergedLabels = tagStore.isLoaded
+    ? Array.from(new Set([...state.timerLabels, ...tagStore.visibleCustomTags.map((t) => t.name)]))
+    : state.timerLabels;
+
+  // --- Task 11.2: Dual-mode render logic ---
+
+  // Mini-timer: only in timer mode
+  if (windowState === 'mini' && appMode === 'timer') {
+    return (
+      <div className="app-wrapper">
+        <div
+          className="widget-container widget-minimized"
+          style={{
+            backgroundColor: `rgba(255, 255, 255, ${state.widgetOpacity / 100})`,
+            maxWidth: state.widgetWidth,
+            // 将透明度比例暴露为 CSS 变量，供内层元素复用
+            ['--widget-opacity' as string]: state.widgetOpacity / 100,
+          }}
+        >
+          <div
+            className="resize-handle-east"
+            onMouseDown={() => void tryStartResizeDrag()}
+            title="拖拽调整宽度"
+            aria-hidden="true"
+          />
+          <div
+            className="top-bar top-bar-minimized"
+            onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+          >
+            <div className="top-bar-drag-zone mini-drag-zone" onMouseDown={handleWindowDragMouseDown}>
+              <div className="mini-info mini-info-visible">
+                <MiniTimer
+                  accentColor={state.accentColor}
+                  activityTag={state.activityTag}
+                  timerStatus={state.timerStatus}
+                  displayTime={timerDisplay}
+                  onSelectTag={handleSelectTag}
+                  timerLabels={mergedLabels}
+                  miniTimerFont={state.miniTimerFont}
+                />
+              </div>
+            </div>
+            <div className="top-actions">
+              <button
+                type="button"
+                className="icon-button"
+                onClick={(e) => { e.stopPropagation(); setWindowState('full'); }}
+                onMouseDown={(e) => e.stopPropagation()}
+                aria-label="展开组件"
+              >
+                <Minimize2 className="action-icon icon-rotate-180" strokeWidth={2} />
+              </button>
+            </div>
+          </div>
+        </div>
+        {recordError && <div className="record-error-toast" role="alert">{recordError}</div>}
+      </div>
+    );
+  }
+
+  // Full layouts
   return (
     <div className="app-wrapper">
       <div
-        className={`widget-container ${isMinimized ? 'widget-minimized' : 'widget-expanded'}`}
+        className="widget-container widget-expanded"
         style={{
           backgroundColor: `rgba(255, 255, 255, ${state.widgetOpacity / 100})`,
           maxWidth: state.widgetWidth,
@@ -100,7 +272,6 @@ export default function App() {
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
-        {/* Right-edge resize handle */}
         <div
           className="resize-handle-east"
           onMouseDown={() => void tryStartResizeDrag()}
@@ -110,116 +281,79 @@ export default function App() {
 
         {/* Top bar */}
         <div
-          className={`top-bar ${isMinimized ? 'top-bar-minimized' : 'top-bar-expanded'}`}
+          className="top-bar top-bar-expanded"
           onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
         >
-          {isMinimized ? (
-            <>
-              <div className="top-bar-drag-zone mini-drag-zone" onMouseDown={handleWindowDragMouseDown}>
-                <div className="mini-info mini-info-visible">
-                  <MiniClock accentColor={state.accentColor} title={state.targetTitle} />
-                </div>
-              </div>
-            </>
-          ) : (
-            <div className="top-bar-drag-zone" onMouseDown={handleWindowDragMouseDown}>
-              <BrandClockIcon accentColor={state.accentColor} />
-            </div>
-          )}
-
-          <div className="top-actions">
-            <button
-              type="button"
-              className="icon-button"
-              onClick={(e) => { e.stopPropagation(); toggleMinimize(); }}
-              onMouseDown={(e) => e.stopPropagation()}
-              aria-label={isMinimized ? '展开组件' : '最小化组件'}
-            >
-              <Minimize2
-                className={`action-icon ${isMinimized ? 'icon-rotate-180' : ''}`}
-                strokeWidth={2}
+          <div className="top-bar-drag-zone" onMouseDown={handleWindowDragMouseDown}>
+            {/* Brand icon doubles as mode-switch entry */}
+            <div className="brand-icon-wrap">
+              <BrandClockIcon
+                accentColor={state.accentColor}
+                variant={appMode === 'widget' ? 'widget' : 'timer'}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setModeMenuOpen((prev) => !prev);
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+                ariaLabel={`当前：${appMode === 'widget' ? '桌面挂件' : '计时钟'}，点击切换模式`}
               />
-            </button>
+              {modeMenuOpen && (
+                <>
+                  {/* Transparent backdrop to close menu on outside click */}
+                  <div
+                    className="mode-menu-backdrop"
+                    onMouseDown={() => setModeMenuOpen(false)}
+                  />
+                  <ModeMenu
+                    appMode={appMode}
+                    accentColor={state.accentColor}
+                    onSwitch={(mode: AppMode) => void setAppMode(mode)}
+                    onClose={() => setModeMenuOpen(false)}
+                    availableModes={ALL_APP_MODES.filter((m) => m !== appMode)}
+                  />
+                </>
+              )}
+            </div>
+          </div>
+          <div className="top-actions">
+            {appMode === 'timer' && (
+              <button
+                type="button"
+                className="icon-button"
+                onClick={(e) => { e.stopPropagation(); handleMinimize(); }}
+                onMouseDown={(e) => e.stopPropagation()}
+                aria-label="最小化组件"
+              >
+                <Minimize2 className="action-icon" strokeWidth={2} />
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Content */}
-        <div className={`content-area ${isMinimized ? 'content-hidden' : 'content-visible'}`}>
-          <AnimatePresence mode="wait">
-            {activeTab === 'timer' && (
-              <TimerTab
-                targetTitle={state.targetTitle}
-                setTargetTitle={state.setTargetTitle}
-                targetDate={state.targetDate}
-                setTargetDate={state.setTargetDate}
-                countdownStyle={state.countdownStyle}
-                accentColor={state.accentColor}
-              />
-            )}
-            {activeTab === 'tasks' && (
-              <TasksTab
-                tasks={state.tasks}
-                accentColor={state.accentColor}
-                onToggle={state.toggleTask}
-                onDelete={state.deleteTask}
-                onAdd={state.addTask}
-                onClearCompleted={state.clearCompletedTasks}
-                onSound={(type) => playSound(type, state.isMuted)}
-              />
-            )}
-            {activeTab === 'stats' && (
-              <StatsTab
-                progressItems={state.progressItems}
-                onAdd={state.addProgress}
-                onDelete={state.deleteProgress}
-                onUpdateTitle={state.updateProgressTitle}
-                onNormalizeTitle={state.normalizeProgressTitle}
-                onUpdateTotal={state.updateProgressTotal}
-                onUpdateProgress={state.updateProgress}
-                onSound={(type) => playSound(type, state.isMuted)}
-              />
-            )}
-            {activeTab === 'settings' && (
-              <SettingsTab
-                isMuted={state.isMuted}
-                setIsMuted={state.setIsMuted}
-                widgetOpacity={state.widgetOpacity}
-                setWidgetOpacity={state.setWidgetOpacity}
-                countdownStyle={state.countdownStyle}
-                setCountdownStyle={state.setCountdownStyle}
-                accentColor={state.accentColor}
-                setAccentColor={state.setAccentColor}
-                autostart={state.autostart}
-                toggleAutostart={state.toggleAutostart}
-                onSound={(type) => playSound(type, state.isMuted)}
-              />
-            )}
-          </AnimatePresence>
-        </div>
-
-        {/* Bottom nav */}
-        <div className={`bottom-nav ${isMinimized ? 'bottom-nav-hidden' : 'bottom-nav-visible'}`}>
-          {(
-            [
-              { tab: 'timer', Icon: Clock, label: '倒计时' },
-              { tab: 'tasks', Icon: CheckSquare, label: '任务列表' },
-              { tab: 'stats', Icon: BarChart2, label: '进度统计' },
-              { tab: 'settings', Icon: Settings, label: '设置' },
-            ] as const
-          ).map(({ tab, Icon, label }) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => changeTab(tab)}
-              className={`nav-btn ${activeTab === tab ? 'nav-btn-active' : 'nav-btn-inactive'}`}
-              style={activeTab === tab ? { color: state.accentColor } : undefined}
-              aria-label={label}
-            >
-              <Icon className="nav-icon" strokeWidth={2} />
-            </button>
-          ))}
-        </div>
+        {/* Content: delegate to WidgetLayout or TimerLayout */}
+        {appMode === 'widget' ? (
+          <WidgetLayout
+            activeTab={widgetTab}
+            setActiveTab={setWidgetTab}
+            state={state}
+            tagStore={tagStore}
+            accentColor={state.accentColor}
+            onSound={(type) => playSound(type, state.isMuted)}
+          />
+        ) : (
+          <TimerLayout
+            timerTab={timerTab}
+            setTimerTab={setTimerTab}
+            records={getTodayRecords()}
+            addRecord={addRecord}
+            state={state}
+            accentColor={state.accentColor}
+            timerLabels={mergedLabels}
+            activeTag={state.activityTag.trim() || undefined}
+          />
+        )}
       </div>
+      {recordError && <div className="record-error-toast" role="alert">{recordError}</div>}
     </div>
   );
 }

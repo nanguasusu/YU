@@ -6,6 +6,7 @@ import {
   ACCENT_COLORS,
   DEFAULT_STATE,
   DEFAULT_OPACITY,
+  DEFAULT_TIMER_LABELS,
   defaultTasks,
   defaultProgressItems,
   getDefaultTargetDate,
@@ -17,7 +18,31 @@ type LegacyPersistedState = Partial<PersistedState> & {
   accentColorId?: string;
 };
 
-const store = new LazyStore(STORE_FILE);
+export const appStateStore = new LazyStore(STORE_FILE);
+
+const isTauriStoreAvailable = () =>
+  typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+
+const loadBrowserFallbackState = (): PersistedState | null => {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    return raw ? normalizeState(JSON.parse(raw) as LegacyPersistedState) : null;
+  } catch {
+    return null;
+  }
+};
+
+const saveBrowserFallbackState = (state: PersistedState) => {
+  if (typeof window === 'undefined') return;
+
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // ignore browser storage failures
+  }
+};
 
 const getDefaultState = (): PersistedState => ({
   ...DEFAULT_STATE,
@@ -34,6 +59,7 @@ const normalizeState = (parsed: LegacyPersistedState): PersistedState => {
     targetTitle: parsed.targetTitle?.trim() || defaults.targetTitle,
     targetDate: parsed.targetDate || defaults.targetDate,
     countdownStyle: parsed.countdownStyle || defaults.countdownStyle,
+    miniTimerFont: parsed.miniTimerFont ?? defaults.miniTimerFont,
     muted: parsed.muted ?? parsed.notifications ?? defaults.muted,
     opacity: Math.min(100, Math.max(20, Number(parsed.opacity) || DEFAULT_OPACITY)),
     widgetWidth: Math.min(480, Math.max(260, Number(parsed.widgetWidth) || defaults.widgetWidth)),
@@ -54,6 +80,20 @@ const normalizeState = (parsed: LegacyPersistedState): PersistedState => {
           }))
         : defaultProgressItems,
     accentColor: /^#[0-9a-fA-F]{6}$/.test(resolvedAccent) ? resolvedAccent : defaults.accentColor,
+    activityTag: parsed.activityTag?.trim() || '',
+    timerStatus:
+      parsed.timerStatus === 'running' || parsed.timerStatus === 'paused' || parsed.timerStatus === 'idle'
+        ? parsed.timerStatus
+        : defaults.timerStatus,
+    elapsedMs: Math.max(0, Number(parsed.elapsedMs) || 0),
+    lastStartedAt:
+      typeof parsed.lastStartedAt === 'number' && Number.isFinite(parsed.lastStartedAt)
+        ? parsed.lastStartedAt
+        : null,
+    timerLabels:
+      Array.isArray(parsed.timerLabels) && parsed.timerLabels.length > 0
+        ? parsed.timerLabels.filter((l): l is string => typeof l === 'string' && l.trim().length > 0)
+        : DEFAULT_TIMER_LABELS,
   };
 };
 
@@ -65,8 +105,8 @@ const migrateLocalStorageState = async (): Promise<PersistedState | null> => {
     if (!raw) return null;
 
     const normalized = normalizeState(JSON.parse(raw) as LegacyPersistedState);
-    await store.set(STORAGE_KEY, normalized);
-    await store.save();
+    await appStateStore.set(STORAGE_KEY, normalized);
+    await appStateStore.save();
     window.localStorage.removeItem(STORAGE_KEY);
     return normalized;
   } catch {
@@ -75,8 +115,12 @@ const migrateLocalStorageState = async (): Promise<PersistedState | null> => {
 };
 
 export const loadPersistedState = async (): Promise<PersistedState> => {
+  if (!isTauriStoreAvailable()) {
+    return loadBrowserFallbackState() ?? getDefaultState();
+  }
+
   try {
-    const stored = await store.get<LegacyPersistedState>(STORAGE_KEY);
+    const stored = await appStateStore.get<LegacyPersistedState>(STORAGE_KEY);
     if (stored) return normalizeState(stored);
 
     const migrated = await migrateLocalStorageState();
@@ -90,6 +134,23 @@ export const loadPersistedState = async (): Promise<PersistedState> => {
 };
 
 export const savePersistedState = async (state: PersistedState): Promise<void> => {
-  await store.set(STORAGE_KEY, state);
-  await store.save();
+  if (!isTauriStoreAvailable()) {
+    saveBrowserFallbackState(state);
+    return;
+  }
+
+  await appStateStore.set(STORAGE_KEY, state);
+  await appStateStore.save();
+};
+
+export const mergePersistedState = async (
+  patch: Partial<PersistedState>,
+): Promise<PersistedState> => {
+  const nextState = {
+    ...(await loadPersistedState()),
+    ...patch,
+  };
+
+  await savePersistedState(nextState);
+  return nextState;
 };

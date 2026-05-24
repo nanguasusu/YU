@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import type { TaskItem } from '../types';
 
 interface TasksTabProps {
+  key?: React.Key;
   tasks: TaskItem[];
   accentColor: string;
   onToggle: (id: number, onSound: (completed: boolean) => void) => void;

@@ -1,10 +1,25 @@
 use tauri_plugin_autostart::MacosLauncher;
 use tauri::Manager;
+use tauri::Emitter;
 use tauri_plugin_store::StoreExt;
+use std::sync::Mutex;
 
 const STORE_FILE: &str = "app-state.json";
-const WINDOW_BOUNDS_KEY: &str = "window-bounds";
-const WINDOW_POSITION_KEY: &str = "window-position";
+const MAIN_WINDOW_LABEL: &str = "main";
+const SETTINGS_WINDOW_LABEL: &str = "settings";
+const MAIN_WINDOW_BOUNDS_KEY: &str = "window-bounds";
+const MAIN_WINDOW_POSITION_KEY: &str = "window-position";
+const SETTINGS_WINDOW_BOUNDS_KEY: &str = "settings-window-bounds";
+const SETTINGS_WINDOW_POSITION_KEY: &str = "settings-window-position";
+
+/// Shared app-level state for tray menu rebuilding
+#[derive(Default)]
+struct AppState {
+  /// Current app mode: "widget" or "timer"
+  app_mode: String,
+  /// Whether the main window is currently visible
+  window_visible: bool,
+}
 
 #[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
 struct WindowBounds {
@@ -43,10 +58,26 @@ fn clamp_bounds_to_monitor(bounds: WindowBounds, monitor: &tauri::Monitor) -> Wi
   }
 }
 
-fn write_window_bounds<R: tauri::Runtime>(app: &tauri::AppHandle<R>, bounds: WindowBounds) {
+fn managed_window_storage_keys(label: &str) -> Option<(&'static str, &'static str)> {
+  match label {
+    MAIN_WINDOW_LABEL => Some((MAIN_WINDOW_BOUNDS_KEY, MAIN_WINDOW_POSITION_KEY)),
+    SETTINGS_WINDOW_LABEL => Some((SETTINGS_WINDOW_BOUNDS_KEY, SETTINGS_WINDOW_POSITION_KEY)),
+    _ => None,
+  }
+}
+
+fn write_window_bounds<R: tauri::Runtime>(
+  app: &tauri::AppHandle<R>,
+  label: &str,
+  bounds: WindowBounds,
+) {
+  let Some((bounds_key, position_key)) = managed_window_storage_keys(label) else {
+    return;
+  };
+
   if let Ok(store) = app.store(STORE_FILE) {
-    store.set(WINDOW_BOUNDS_KEY, serde_json::json!(bounds));
-    store.delete(WINDOW_POSITION_KEY);
+    store.set(bounds_key, serde_json::json!(bounds));
+    store.delete(position_key);
     let _ = store.save();
   }
 }
@@ -55,6 +86,7 @@ fn save_window_bounds<R: tauri::Runtime>(app: &tauri::AppHandle<R>, window: &tau
   if let (Ok(position), Ok(size)) = (window.outer_position(), window.outer_size()) {
     write_window_bounds(
       app,
+      window.label(),
       WindowBounds {
         x: position.x,
         y: position.y,
@@ -72,6 +104,7 @@ fn save_webview_window_bounds<R: tauri::Runtime>(
   if let (Ok(position), Ok(size)) = (window.outer_position(), window.outer_size()) {
     write_window_bounds(
       app,
+      window.label(),
       WindowBounds {
         x: position.x,
         y: position.y,
@@ -82,18 +115,22 @@ fn save_webview_window_bounds<R: tauri::Runtime>(
   }
 }
 
-fn load_window_bounds<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Option<WindowBounds> {
+fn load_window_bounds_for_label<R: tauri::Runtime>(
+  app: &tauri::AppHandle<R>,
+  label: &str,
+) -> Option<WindowBounds> {
+  let (bounds_key, position_key) = managed_window_storage_keys(label)?;
   let Ok(store) = app.store(STORE_FILE) else {
     return None;
   };
 
-  if let Some(saved) = store.get(WINDOW_BOUNDS_KEY) {
+  if let Some(saved) = store.get(bounds_key) {
     if let Ok(bounds) = serde_json::from_value::<WindowBounds>(saved) {
       return Some(bounds);
     }
   }
 
-  let saved = store.get(WINDOW_POSITION_KEY)?;
+  let saved = store.get(position_key)?;
   let Ok(position) = serde_json::from_value::<serde_json::Value>(saved) else {
     return None;
   };
@@ -101,8 +138,8 @@ fn load_window_bounds<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Option<Wi
   Some(WindowBounds {
     x: position.get("x")?.as_i64()? as i32,
     y: position.get("y")?.as_i64()? as i32,
-    width: 320,
-    height: 560,
+    width: if label == SETTINGS_WINDOW_LABEL { 360 } else { 320 },
+    height: if label == SETTINGS_WINDOW_LABEL { 460 } else { 560 },
   })
 }
 
@@ -110,7 +147,7 @@ fn restore_window_bounds<R: tauri::Runtime>(
   app: &tauri::AppHandle<R>,
   window: &tauri::WebviewWindow<R>,
 ) {
-  let Some(saved_bounds) = load_window_bounds(app) else {
+  let Some(saved_bounds) = load_window_bounds_for_label(app, window.label()) else {
     return;
   };
 
@@ -139,16 +176,44 @@ fn restore_window_bounds<R: tauri::Runtime>(
     || bounds.width != saved_bounds.width
     || bounds.height != saved_bounds.height
   {
-    write_window_bounds(app, bounds);
+    write_window_bounds(app, window.label(), bounds);
   }
 }
 
-fn save_if_main_window<R: tauri::Runtime>(window: &tauri::Window<R>) {
-  if window.label() != "main" {
+fn save_if_managed_window<R: tauri::Runtime>(window: &tauri::Window<R>) {
+  if managed_window_storage_keys(window.label()).is_none() {
     return;
   }
 
   save_window_bounds(&window.app_handle(), window);
+}
+
+#[cfg(desktop)]
+fn create_settings_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<()> {
+  if app.get_webview_window(SETTINGS_WINDOW_LABEL).is_some() {
+    return Ok(());
+  }
+
+  let window = tauri::WebviewWindowBuilder::new(
+    app,
+    SETTINGS_WINDOW_LABEL,
+    tauri::WebviewUrl::App("index.html".into()),
+  )
+  .title("屿设置")
+  .inner_size(360.0, 460.0)
+  .min_inner_size(320.0, 400.0)
+  .max_inner_size(420.0, 560.0)
+  .resizable(false)
+  .skip_taskbar(true)
+  .visible(false)
+  .decorations(false)
+  .transparent(true)
+  .shadow(false)
+  .build()?;
+
+  restore_window_bounds(app, &window);
+  let _ = window.set_skip_taskbar(true);
+  Ok(())
 }
 
 #[tauri::command]
@@ -281,11 +346,63 @@ fn trim_memory() {
   }
 }
 
+#[tauri::command]
+fn set_app_mode(app: tauri::AppHandle, mode: String) {
+    // Update shared state
+    if let Some(state) = app.try_state::<Mutex<AppState>>() {
+        if let Ok(mut s) = state.lock() {
+            s.app_mode = mode.clone();
+        }
+        rebuild_tray_menu(&app);
+    }
+    app.emit("app-mode-changed", mode).ok();
+}
+
+/// Build the tray menu based on current AppState.
+#[cfg(desktop)]
+fn rebuild_tray_menu(app: &tauri::AppHandle) {
+    use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
+
+    let (window_visible, app_mode) = if let Some(state) = app.try_state::<Mutex<AppState>>() {
+        if let Ok(s) = state.lock() {
+            (s.window_visible, s.app_mode.clone())
+        } else {
+            (true, "widget".to_string())
+        }
+    } else {
+        (true, "widget".to_string())
+    };
+
+    let toggle_label = if window_visible { "隐藏悬浮窗" } else { "显示悬浮窗" };
+    let switch_label = if app_mode == "timer" { "切换到桌面挂件" } else { "切换到计时钟" };
+    let switch_id = if app_mode == "timer" { "switch-to-widget" } else { "switch-to-timer" };
+
+    let Ok(toggle) = MenuItem::with_id(app, "toggle-window", toggle_label, true, None::<&str>) else { return; };
+    let Ok(sep1) = PredefinedMenuItem::separator(app) else { return; };
+    let Ok(switch) = MenuItem::with_id(app, switch_id, switch_label, true, None::<&str>) else { return; };
+    let Ok(sep2) = PredefinedMenuItem::separator(app) else { return; };
+    let Ok(settings) = MenuItem::with_id(app, "settings", "设置", true, None::<&str>) else { return; };
+    let Ok(quit) = MenuItem::with_id(app, "quit", "退出", true, None::<&str>) else { return; };
+
+    let Ok(menu) = Menu::with_items(app, &[&toggle, &sep1, &switch, &sep2, &settings, &quit]) else { return; };
+
+    if let Some(tray) = app.tray_by_id("main-tray") {
+        let _ = tray.set_menu(Some(menu));
+    }
+}
+
+#[cfg(not(desktop))]
+fn rebuild_tray_menu(_app: &tauri::AppHandle) {}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
     .plugin(tauri_plugin_store::Builder::new().build())
     .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
+    .manage(Mutex::new(AppState {
+      app_mode: "widget".to_string(),
+      window_visible: true,
+    }))
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(
@@ -295,6 +412,21 @@ pub fn run() {
         )?;
       }
 
+      // Load persisted app-mode so tray reflects the correct mode on startup
+      if let Ok(store) = app.store(STORE_FILE) {
+        if let Some(val) = store.get("app-mode") {
+          if let Some(mode_str) = val.as_str() {
+            if mode_str == "widget" || mode_str == "timer" {
+              if let Some(state) = app.try_state::<Mutex<AppState>>() {
+                if let Ok(mut s) = state.lock() {
+                  s.app_mode = mode_str.to_string();
+                }
+              }
+            }
+          }
+        }
+      }
+
       #[cfg(desktop)]
       {
         use tauri::{
@@ -302,14 +434,27 @@ pub fn run() {
           tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
         };
 
-        if let Some(window) = app.get_webview_window("main") {
+        if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
           restore_window_bounds(app.handle(), &window);
         }
 
-        let show = MenuItem::with_id(app, "show", "显示窗口", true, None::<&str>)?;
+        // Build initial tray menu
+        let app_mode = if let Some(state) = app.try_state::<Mutex<AppState>>() {
+          state.lock().map(|s| s.app_mode.clone()).unwrap_or_else(|_| "widget".to_string())
+        } else {
+          "widget".to_string()
+        };
+
+        let switch_label = if app_mode == "timer" { "切换到桌面挂件" } else { "切换到计时钟" };
+        let switch_id = if app_mode == "timer" { "switch-to-widget" } else { "switch-to-timer" };
+
+        let toggle = MenuItem::with_id(app, "toggle-window", "隐藏悬浮窗", true, None::<&str>)?;
+        let sep1 = PredefinedMenuItem::separator(app)?;
+        let switch = MenuItem::with_id(app, switch_id, switch_label, true, None::<&str>)?;
+        let sep2 = PredefinedMenuItem::separator(app)?;
+        let settings = MenuItem::with_id(app, "settings", "设置", true, None::<&str>)?;
         let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
-        let separator = PredefinedMenuItem::separator(app)?;
-        let menu = Menu::with_items(app, &[&show, &separator, &quit])?;
+        let menu = Menu::with_items(app, &[&toggle, &sep1, &switch, &sep2, &settings, &quit])?;
         let icon = app.default_window_icon().cloned().unwrap();
 
         TrayIconBuilder::with_id("main-tray")
@@ -318,9 +463,55 @@ pub fn run() {
           .menu(&menu)
           .show_menu_on_left_click(false)
           .on_menu_event(|app, event| match event.id().as_ref() {
-            "show" => show_main_window(app),
+            "toggle-window" => {
+              let visible = if let Some(state) = app.try_state::<Mutex<AppState>>() {
+                state.lock().map(|s| s.window_visible).unwrap_or(true)
+              } else {
+                true
+              };
+              if visible {
+                if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
+                  let _ = window.hide();
+                }
+                if let Some(state) = app.try_state::<Mutex<AppState>>() {
+                  if let Ok(mut s) = state.lock() { s.window_visible = false; }
+                }
+              } else {
+                show_main_window(app);
+                if let Some(state) = app.try_state::<Mutex<AppState>>() {
+                  if let Ok(mut s) = state.lock() { s.window_visible = true; }
+                }
+              }
+              rebuild_tray_menu(app);
+            },
+            "switch-to-widget" => {
+              if let Some(state) = app.try_state::<Mutex<AppState>>() {
+                if let Ok(mut s) = state.lock() { s.app_mode = "widget".to_string(); }
+              }
+              app.emit("app-mode-changed", "widget").ok();
+              show_main_window(app);
+              if let Some(state) = app.try_state::<Mutex<AppState>>() {
+                if let Ok(mut s) = state.lock() { s.window_visible = true; }
+              }
+              rebuild_tray_menu(app);
+            },
+            "switch-to-timer" => {
+              if let Some(state) = app.try_state::<Mutex<AppState>>() {
+                if let Ok(mut s) = state.lock() { s.app_mode = "timer".to_string(); }
+              }
+              app.emit("app-mode-changed", "timer").ok();
+              show_main_window(app);
+              if let Some(state) = app.try_state::<Mutex<AppState>>() {
+                if let Ok(mut s) = state.lock() { s.window_visible = true; }
+              }
+              rebuild_tray_menu(app);
+            },
+            "settings" => show_settings_window(app),
             "quit" => {
-              if let Some(window) = app.get_webview_window("main") {
+              if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
+                save_webview_window_bounds(app, &window);
+              }
+              if let Some(window) = app.get_webview_window(SETTINGS_WINDOW_LABEL) {
                 save_webview_window_bounds(app, &window);
               }
               app.exit(0);
@@ -334,12 +525,28 @@ pub fn run() {
               ..
             } = event
             {
-              show_main_window(tray.app_handle());
+              let app = tray.app_handle();
+              let visible = if let Some(state) = app.try_state::<Mutex<AppState>>() {
+                state.lock().map(|s| s.window_visible).unwrap_or(true)
+              } else {
+                true
+              };
+              if visible {
+                if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
+                  let _ = window.set_focus();
+                }
+              } else {
+                show_main_window(app);
+                if let Some(state) = app.try_state::<Mutex<AppState>>() {
+                  if let Ok(mut s) = state.lock() { s.window_visible = true; }
+                }
+                rebuild_tray_menu(app);
+              }
             }
           })
           .build(app)?;
 
-        if let Some(window) = app.get_webview_window("main") {
+        if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
           let _ = window.set_skip_taskbar(true);
         }
       }
@@ -348,23 +555,49 @@ pub fn run() {
     })
     .on_window_event(|window, event| {
       match event {
-        tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_) => save_if_main_window(window),
+        tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_) => save_if_managed_window(window),
         tauri::WindowEvent::CloseRequested { api, .. } => {
-          api.prevent_close();
-          save_if_main_window(window);
-          let _ = window.hide();
+          save_if_managed_window(window);
+          if window.label() == MAIN_WINDOW_LABEL {
+            api.prevent_close();
+            let _ = window.hide();
+            // Update shared state and rebuild tray
+            let app = window.app_handle();
+            if let Some(state) = app.try_state::<Mutex<AppState>>() {
+              if let Ok(mut s) = state.lock() { s.window_visible = false; }
+            }
+            rebuild_tray_menu(app);
+          }
         }
         _ => {}
       }
     })
-    .invoke_handler(tauri::generate_handler![get_autostart, set_autostart, trim_memory])
+    .invoke_handler(tauri::generate_handler![
+      get_autostart,
+      set_autostart,
+      trim_memory,
+      set_app_mode,
+    ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
 }
 
 #[cfg(desktop)]
 fn show_main_window(app: &tauri::AppHandle) {
-  if let Some(window) = app.get_webview_window("main") {
+  if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
+    let _ = window.show();
+    let _ = window.set_focus();
+    let _ = window.set_skip_taskbar(true);
+  }
+}
+
+#[cfg(desktop)]
+fn show_settings_window(app: &tauri::AppHandle) {
+  if app.get_webview_window(SETTINGS_WINDOW_LABEL).is_none() {
+    let _ = create_settings_window(app);
+  }
+
+  if let Some(window) = app.get_webview_window(SETTINGS_WINDOW_LABEL) {
     let _ = window.show();
     let _ = window.set_focus();
     let _ = window.set_skip_taskbar(true);
