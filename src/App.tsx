@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Minimize2 } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
@@ -91,7 +91,7 @@ export default function App() {
 
   // --- Task 11.1: New hooks and state ---
   const { appMode, setAppMode } = useAppMode();
-  const { addRecord, getTodayRecords } = useTimerRecords();
+  const { addRecord, records } = useTimerRecords();
   const [windowState, setWindowState] = useState<WindowState>('full');
   const [widgetTab, setWidgetTab] = useState<WidgetTab>('countdown');
   const [timerTab, setTimerTab] = useState<TimerTab>('start');
@@ -200,9 +200,11 @@ export default function App() {
   };
 
   // --- Task 6.1: Merge timerLabels with visibleCustomTags ---
-  const mergedLabels = tagStore.isLoaded
-    ? Array.from(new Set([...state.timerLabels, ...tagStore.visibleCustomTags.map((t) => t.name)]))
-    : state.timerLabels;
+  const mergedLabels = useMemo(() => (
+    tagStore.isLoaded
+      ? Array.from(new Set([...state.timerLabels, ...tagStore.visibleCustomTags.map((t) => t.name)]))
+      : state.timerLabels
+  ), [state.timerLabels, tagStore.isLoaded, tagStore.visibleCustomTags]);
 
   // --- Task 11.2: Dual-mode render logic ---
 
@@ -344,8 +346,9 @@ export default function App() {
           <TimerLayout
             timerTab={timerTab}
             setTimerTab={setTimerTab}
-            records={getTodayRecords()}
+            records={records}
             addRecord={addRecord}
+            liveElapsedMs={liveElapsedMs}
             state={state}
             accentColor={state.accentColor}
             timerLabels={mergedLabels}

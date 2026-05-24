@@ -5,13 +5,13 @@ import { TagPicker } from './TagPicker';
 import { formatElapsedTime } from '../types';
 import type { TimerRecord } from '../types';
 import type { usePersistedState } from '../hooks/usePersistedState';
-import { useLiveElapsedMs } from '../hooks/useLiveElapsedMs';
 
 interface TimerStartPageProps {
   state: ReturnType<typeof usePersistedState>;
   timerLabels: string[];
   accentColor: string;
   onAddRecord: (record: TimerRecord) => Promise<void>;
+  liveElapsedMs: number;
 }
 
 export const TimerStartPage: React.FC<TimerStartPageProps> = ({
@@ -19,9 +19,8 @@ export const TimerStartPage: React.FC<TimerStartPageProps> = ({
   timerLabels,
   accentColor,
   onAddRecord,
+  liveElapsedMs,
 }) => {
-  const liveElapsedMs = useLiveElapsedMs(state.timerStatus, state.elapsedMs, state.lastStartedAt);
-
   const handleStopAndRecord = async () => {
     const now = Date.now();
     const totalElapsed =

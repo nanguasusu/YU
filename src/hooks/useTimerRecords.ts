@@ -3,6 +3,8 @@ import { appStateStore } from '../lib/storage';
 import { TIMER_RECORDS_KEY } from '../types';
 import type { TimerRecord } from '../types';
 
+const MAX_RECORDS_PER_DAY = 500;
+
 const isTauriAvailable = () =>
   typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
@@ -11,10 +13,10 @@ const loadRecords = async (): Promise<TimerRecord[]> => {
     if (isTauriAvailable()) {
       const stored = await appStateStore.get<TimerRecord[]>(TIMER_RECORDS_KEY);
       return stored ?? [];
-    } else {
-      const raw = localStorage.getItem(TIMER_RECORDS_KEY);
-      return raw ? (JSON.parse(raw) as TimerRecord[]) : [];
     }
+
+    const raw = localStorage.getItem(TIMER_RECORDS_KEY);
+    return raw ? (JSON.parse(raw) as TimerRecord[]) : [];
   } catch {
     return [];
   }
@@ -33,53 +35,64 @@ const saveRecords = async (records: TimerRecord[]): Promise<void> => {
   }
 };
 
-/** 返回今天零点的时间戳（毫秒） */
-function getTodayStart(): number {
-  const now = new Date();
+function getTodayStart(now = new Date()): number {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+}
+
+function getTodayWindow(now = new Date()) {
+  const start = getTodayStart(now);
+  return {
+    start,
+    end: start + 86_400_000,
+  };
+}
+
+export function normalizeTodayRecords(
+  records: TimerRecord[],
+  now = new Date(),
+): TimerRecord[] {
+  const { start, end } = getTodayWindow(now);
+  return records
+    .filter((record) => record.startTime >= start && record.startTime < end)
+    .sort((a, b) => a.startTime - b.startTime)
+    .slice(-MAX_RECORDS_PER_DAY);
+}
+
+export function applyAddRecord(prev: TimerRecord[], record: TimerRecord, now = new Date()): TimerRecord[] {
+  if (record.duration < 1000) return prev;
+
+  const normalized = normalizeTodayRecords(prev, now);
+  if (normalized.some((item) => item.id === record.id)) return normalized;
+
+  return normalizeTodayRecords([...normalized, record], now);
 }
 
 export function useTimerRecords() {
   const [records, setRecords] = useState<TimerRecord[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // 加载时自动清除非今日记录
   useEffect(() => {
     const load = async () => {
       const loaded = await loadRecords();
-      const todayStart = getTodayStart();
-      const todayEnd = todayStart + 86_400_000;
-      const todayOnly = loaded.filter(
-        (r) => r.startTime >= todayStart && r.startTime < todayEnd,
-      );
-      // 如果有旧数据被清除，立即写回存储
-      if (todayOnly.length !== loaded.length) {
-        void saveRecords(todayOnly);
+      const normalized = normalizeTodayRecords(loaded);
+      if (normalized.length !== loaded.length) {
+        void saveRecords(normalized);
       }
-      setRecords(todayOnly);
+      setRecords(normalized);
       setIsLoaded(true);
     };
     void load();
   }, []);
 
   const addRecord = useCallback(async (record: TimerRecord) => {
-    // Enforce minimum duration
-    if (record.duration < 1000) return;
-
     setRecords((prev) => {
-      // 幂等检查：相同 id 已存在则跳过
-      if (prev.some((r) => r.id === record.id)) return prev;
-      const updated = [...prev, record];
-      void saveRecords(updated);
+      const updated = applyAddRecord(prev, record);
+      if (updated !== prev) {
+        void saveRecords(updated);
+      }
       return updated;
     });
   }, []);
 
-  const getTodayRecords = useCallback((): TimerRecord[] => {
-    const todayStart = getTodayStart();
-    const todayEnd = todayStart + 86_400_000;
-    return records.filter((r) => r.startTime >= todayStart && r.startTime < todayEnd);
-  }, [records]);
-
-  return { records, isLoaded, addRecord, getTodayRecords };
+  return { records, isLoaded, addRecord };
 }

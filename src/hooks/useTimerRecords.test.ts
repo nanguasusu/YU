@@ -1,107 +1,100 @@
 /**
- * Property-based tests for useTimerRecords addRecord idempotency logic.
- *
- * Since the idempotency check lives inside the setRecords functional update
- * callback, we extract and test that pure logic directly.
- *
- * Validates: Requirements 9.1, 9.2
+ * Property-based tests for useTimerRecords normalization and addRecord logic.
  */
 
 import { describe, it, expect } from 'vitest';
 import * as fc from 'fast-check';
 import type { TimerRecord } from '../types';
+import { applyAddRecord, normalizeTodayRecords } from './useTimerRecords';
 
-// ---------------------------------------------------------------------------
-// Pure helper that mirrors the functional-update logic inside addRecord
-// ---------------------------------------------------------------------------
+const DAY_MS = 86_400_000;
+const MAX_RECORDS_PER_DAY = 500;
+const FIXED_NOW = new Date('2026-05-24T12:00:00');
+const FIXED_DAY_START = new Date('2026-05-24T00:00:00').getTime();
 
-/**
- * Applies the addRecord functional-update logic to a previous records array.
- * This is the exact logic from useTimerRecords.ts:
- *   - skip if duration < 1000
- *   - skip if id already present
- *   - otherwise append
- */
-function applyAddRecord(prev: TimerRecord[], record: TimerRecord): TimerRecord[] {
-  if (record.duration < 1000) return prev;
-  if (prev.some((r) => r.id === record.id)) return prev;
-  return [...prev, record];
-}
-
-// ---------------------------------------------------------------------------
-// Arbitraries
-// ---------------------------------------------------------------------------
-
-/** Generates a valid TimerRecord with duration >= 1000 */
 const validTimerRecord = (): fc.Arbitrary<TimerRecord> =>
   fc.record({
     id: fc.uuid(),
     title: fc.string({ minLength: 1, maxLength: 50 }),
     tag: fc.option(fc.string({ minLength: 1, maxLength: 20 }), { nil: undefined }),
     startTime: fc.integer({ min: 0, max: Date.now() }),
-    endTime: fc.integer({ min: 0, max: Date.now() + 86_400_000 }),
-    duration: fc.integer({ min: 1000, max: 86_400_000 }),
+    endTime: fc.integer({ min: 0, max: Date.now() + DAY_MS }),
+    duration: fc.integer({ min: 1000, max: DAY_MS }),
     note: fc.option(fc.string({ maxLength: 200 }), { nil: undefined }),
   });
 
-/** Generates an array of distinct-id TimerRecords (all valid) */
+const todayTimerRecord = (): fc.Arbitrary<TimerRecord> =>
+  fc.record({
+    id: fc.uuid(),
+    title: fc.string({ minLength: 1, maxLength: 50 }),
+    tag: fc.option(fc.string({ minLength: 1, maxLength: 20 }), { nil: undefined }),
+    startTime: fc.integer({ min: FIXED_DAY_START, max: FIXED_DAY_START + DAY_MS - 1 }),
+    endTime: fc.integer({ min: FIXED_DAY_START, max: FIXED_DAY_START + DAY_MS - 1 }),
+    duration: fc.integer({ min: 1000, max: DAY_MS }),
+    note: fc.option(fc.string({ maxLength: 200 }), { nil: undefined }),
+  }).map((record) => ({
+    ...record,
+    endTime: Math.max(record.endTime, record.startTime),
+  }));
+
 const recordArray = (): fc.Arbitrary<TimerRecord[]> =>
   fc.uniqueArray(validTimerRecord(), {
-    selector: (r) => r.id,
+    selector: (record) => record.id,
     minLength: 0,
-    maxLength: 20,
+    maxLength: 600,
   });
 
-/** Generates a positive integer for "how many times to call addRecord" */
 const callCount = (): fc.Arbitrary<number> =>
   fc.integer({ min: 1, max: 10 });
 
-// ---------------------------------------------------------------------------
-// Property 5: addRecord 幂等性
-// **Validates: Requirements 9.1, 9.2**
-//
-// For any valid TimerRecord (duration >= 1000), calling addRecord with the
-// same record N times results in exactly one entry with that id in records.
-// ---------------------------------------------------------------------------
+describe('useTimerRecords helpers', () => {
+  it('normalizeTodayRecords 只保留当天记录并按时间排序', () => {
+    const now = FIXED_NOW;
+    const todayStart = FIXED_DAY_START;
+    const records: TimerRecord[] = [
+      { id: 'b', title: 'b', startTime: todayStart + 2_000, endTime: todayStart + 4_000, duration: 2_000 },
+      { id: 'old', title: 'old', startTime: todayStart - 1_000, endTime: todayStart + 1_000, duration: 2_000 },
+      { id: 'a', title: 'a', startTime: todayStart + 1_000, endTime: todayStart + 2_000, duration: 1_000 },
+    ];
 
-describe('Property 5: addRecord 幂等性', () => {
-  it('同一 record 调用任意次，records 中该 id 恰好出现一次 — Validates: Requirements 9.1, 9.2', () => {
-    fc.assert(
-      fc.property(recordArray(), validTimerRecord(), callCount(), (initial, record, n) => {
-        // Ensure the record is not already in the initial array (clean slate for this id)
-        const prev = initial.filter((r) => r.id !== record.id);
+    expect(normalizeTodayRecords(records, now).map((record) => record.id)).toEqual(['a', 'b']);
+  });
 
-        // Apply addRecord n times with the same record
+  it('normalizeTodayRecords 会裁剪到上限 500 条，保留最新记录', () => {
+    const now = FIXED_NOW;
+    const todayStart = FIXED_DAY_START;
+    const records = Array.from({ length: 520 }, (_, index) => ({
+      id: `r-${index}`,
+      title: `${index}`,
+      startTime: todayStart + index,
+      endTime: todayStart + index + 1_000,
+      duration: 1_000,
+    }));
+
+    const normalized = normalizeTodayRecords(records, now);
+    expect(normalized).toHaveLength(MAX_RECORDS_PER_DAY);
+    expect(normalized[0]?.id).toBe('r-20');
+    expect(normalized.at(-1)?.id).toBe('r-519');
+  });
+
+  it('同一 record 调用任意次数，结果里该 id 只出现一次', () => {
+      fc.assert(
+      fc.property(recordArray(), todayTimerRecord(), callCount(), (initial, record, n) => {
+        const now = FIXED_NOW;
+        const prev = initial.filter((item) => item.id !== record.id);
         let state = prev;
-        for (let i = 0; i < n; i++) {
-          state = applyAddRecord(state, record);
+
+        for (let i = 0; i < n; i += 1) {
+          state = applyAddRecord(state, record, now);
         }
 
-        // The id must appear exactly once
-        const occurrences = state.filter((r) => r.id === record.id).length;
-        return occurrences === 1;
+        return state.filter((item) => item.id === record.id).length === 1;
       }),
       { numRuns: 1000 },
     );
   });
 
-  it('已存在相同 id 时不追加新记录 — Validates: Requirements 9.1, 9.2', () => {
-    fc.assert(
-      fc.property(recordArray(), validTimerRecord(), (initial, record) => {
-        // Pre-populate with the record
-        const prev = [...initial.filter((r) => r.id !== record.id), record];
-        const lengthBefore = prev.length;
-
-        // Calling again must not change the array
-        const next = applyAddRecord(prev, record);
-
-        return next.length === lengthBefore && next.filter((r) => r.id === record.id).length === 1;
-      }),
-      { numRuns: 1000 },
-    );
-  });
-
-  it('duration < 1000 的 record 不被追加 — Validates: Requirements 9.1', () => {
+  it('duration < 1000 的 record 不会被添加', () => {
     fc.assert(
       fc.property(
         recordArray(),
@@ -109,14 +102,14 @@ describe('Property 5: addRecord 幂等性', () => {
           id: fc.uuid(),
           title: fc.string({ minLength: 1, maxLength: 50 }),
           tag: fc.option(fc.string({ minLength: 1, maxLength: 20 }), { nil: undefined }),
-          startTime: fc.integer({ min: 0, max: Date.now() }),
-          endTime: fc.integer({ min: 0, max: Date.now() + 86_400_000 }),
-          duration: fc.integer({ min: 0, max: 999 }), // invalid duration
+          startTime: fc.integer({ min: FIXED_DAY_START, max: FIXED_DAY_START + DAY_MS - 1 }),
+          endTime: fc.integer({ min: FIXED_DAY_START, max: FIXED_DAY_START + DAY_MS - 1 }),
+          duration: fc.integer({ min: 0, max: 999 }),
           note: fc.option(fc.string({ maxLength: 200 }), { nil: undefined }),
         }),
         (prev, shortRecord) => {
-          const next = applyAddRecord(prev, shortRecord);
-          // Array must be unchanged (same reference or same length with no new id)
+          const now = FIXED_NOW;
+          const next = applyAddRecord(prev, shortRecord, now);
           return next === prev;
         },
       ),
@@ -124,15 +117,34 @@ describe('Property 5: addRecord 幂等性', () => {
     );
   });
 
-  it('首次添加有效 record 后数组长度恰好增加 1 — Validates: Requirements 9.2', () => {
-    fc.assert(
-      fc.property(recordArray(), validTimerRecord(), (initial, record) => {
-        // Ensure record id is not in initial
-        const prev = initial.filter((r) => r.id !== record.id);
-        const next = applyAddRecord(prev, record);
-        return next.length === prev.length + 1;
-      }),
-      { numRuns: 1000 },
-    );
+  it('applyAddRecord 会在添加时清掉非当天记录并维持上限', () => {
+    const now = FIXED_NOW;
+    const todayStart = FIXED_DAY_START;
+    const oldRecord: TimerRecord = {
+      id: 'old',
+      title: 'old',
+      startTime: todayStart - 5_000,
+      endTime: todayStart - 1_000,
+      duration: 4_000,
+    };
+    const todayRecords = Array.from({ length: 500 }, (_, index) => ({
+      id: `today-${index}`,
+      title: `${index}`,
+      startTime: todayStart + index,
+      endTime: todayStart + index + 1_000,
+      duration: 1_000,
+    }));
+    const nextRecord: TimerRecord = {
+      id: 'new',
+      title: 'new',
+      startTime: todayStart + 10_000,
+      endTime: todayStart + 12_000,
+      duration: 2_000,
+    };
+
+    const result = applyAddRecord([oldRecord, ...todayRecords], nextRecord, now);
+    expect(result).toHaveLength(MAX_RECORDS_PER_DAY);
+    expect(result.some((record) => record.id === 'old')).toBe(false);
+    expect(result.some((record) => record.id === 'new')).toBe(true);
   });
 });

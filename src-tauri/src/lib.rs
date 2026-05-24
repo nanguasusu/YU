@@ -2,7 +2,9 @@ use tauri_plugin_autostart::MacosLauncher;
 use tauri::Manager;
 use tauri::Emitter;
 use tauri_plugin_store::StoreExt;
+use std::collections::HashMap;
 use std::sync::Mutex;
+use std::time::Duration;
 
 const STORE_FILE: &str = "app-state.json";
 const MAIN_WINDOW_LABEL: &str = "main";
@@ -19,6 +21,8 @@ struct AppState {
   app_mode: String,
   /// Whether the main window is currently visible
   window_visible: bool,
+  /// Debounce token for window bounds persistence per managed window
+  window_save_tokens: HashMap<String, u64>,
 }
 
 #[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
@@ -186,6 +190,49 @@ fn save_if_managed_window<R: tauri::Runtime>(window: &tauri::Window<R>) {
   }
 
   save_window_bounds(&window.app_handle(), window);
+}
+
+fn schedule_window_bounds_save<R: tauri::Runtime + 'static>(
+  app: tauri::AppHandle<R>,
+  label: String,
+) {
+  if managed_window_storage_keys(&label).is_none() {
+    return;
+  }
+
+  let next_token = if let Some(state) = app.try_state::<Mutex<AppState>>() {
+    if let Ok(mut state) = state.lock() {
+      let entry = state.window_save_tokens.entry(label.clone()).or_insert(0);
+      *entry += 1;
+      *entry
+    } else {
+      return;
+    }
+  } else {
+    return;
+  };
+
+  std::thread::spawn(move || {
+    std::thread::sleep(Duration::from_millis(300));
+
+    let should_save = if let Some(state) = app.try_state::<Mutex<AppState>>() {
+      if let Ok(state) = state.lock() {
+        state.window_save_tokens.get(&label).copied() == Some(next_token)
+      } else {
+        false
+      }
+    } else {
+      false
+    };
+
+    if !should_save {
+      return;
+    }
+
+    if let Some(window) = app.get_webview_window(&label) {
+      save_webview_window_bounds(&app, &window);
+    }
+  });
 }
 
 #[cfg(desktop)]
@@ -402,6 +449,7 @@ pub fn run() {
     .manage(Mutex::new(AppState {
       app_mode: "widget".to_string(),
       window_visible: true,
+      window_save_tokens: HashMap::new(),
     }))
     .setup(|app| {
       if cfg!(debug_assertions) {
@@ -555,7 +603,9 @@ pub fn run() {
     })
     .on_window_event(|window, event| {
       match event {
-        tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_) => save_if_managed_window(window),
+        tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_) => {
+          schedule_window_bounds_save(window.app_handle().clone(), window.label().to_string());
+        }
         tauri::WindowEvent::CloseRequested { api, .. } => {
           save_if_managed_window(window);
           if window.label() == MAIN_WINDOW_LABEL {

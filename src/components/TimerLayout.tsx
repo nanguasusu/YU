@@ -14,6 +14,7 @@ interface TimerLayoutProps {
   setTimerTab: (tab: TimerTab) => void;
   records: TimerRecord[];
   addRecord: (record: TimerRecord) => Promise<void>;
+  liveElapsedMs: number;
   state: ReturnType<typeof usePersistedState>;
   accentColor: string;
   timerLabels: string[];
@@ -32,6 +33,7 @@ export function TimerLayout({
   setTimerTab,
   records,
   addRecord,
+  liveElapsedMs,
   state,
   accentColor,
   timerLabels,
@@ -54,6 +56,7 @@ export function TimerLayout({
               timerLabels={timerLabels}
               accentColor={accentColor}
               onAddRecord={addRecord}
+              liveElapsedMs={liveElapsedMs}
             />
           )}
           {timerTab === 'timeline' && (

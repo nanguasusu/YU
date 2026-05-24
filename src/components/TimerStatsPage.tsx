@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { motion } from 'motion/react';
 import { formatTotalHours, formatDuration, TimerRecord } from '../types';
 import { buildTagColorMapFromRecords } from '../lib/tag-colors';
@@ -7,16 +7,13 @@ interface TimerStatsPageProps {
   key?: React.Key;
   records: TimerRecord[];
   accentColor: string;
-  /** The tag currently being timed, so it always gets the accent color */
   activeTag?: string;
 }
 
 type TagStat = {
   tag: string;
   totalMs: number;
-  /** 显示用百分比字符串，如 "34%"、"<1%" */
   percentageLabel: string;
-  /** 进度条宽度（0–100），使用精确值避免 <1% 时进度条消失 */
   barWidth: number;
   color: string;
 };
@@ -26,7 +23,7 @@ function computeTagStats(
   accentColor: string,
   activeTag?: string,
 ): TagStat[] {
-  const totalMs = records.reduce((sum, r) => sum + r.duration, 0);
+  const totalMs = records.reduce((sum, record) => sum + record.duration, 0);
   if (totalMs === 0) return [];
 
   const tagMap = new Map<string, number>();
@@ -57,8 +54,14 @@ export default function TimerStatsPage({
   accentColor,
   activeTag,
 }: TimerStatsPageProps) {
-  const stats = computeTagStats(records, accentColor, activeTag);
-  const totalMs = records.reduce((sum, r) => sum + r.duration, 0);
+  const totalMs = useMemo(
+    () => records.reduce((sum, record) => sum + record.duration, 0),
+    [records],
+  );
+  const stats = useMemo(
+    () => computeTagStats(records, accentColor, activeTag),
+    [records, accentColor, activeTag],
+  );
 
   return (
     <motion.div
@@ -68,7 +71,6 @@ export default function TimerStatsPage({
       exit={{ opacity: 0, x: -15, transition: { duration: 0.15 } }}
       transition={{ duration: 0.3, ease: 'easeOut' }}
     >
-      {/* Header */}
       <div className="ts-header">
         <span className="ts-title">今日统计</span>
         {totalMs > 0 && (
@@ -82,23 +84,23 @@ export default function TimerStatsPage({
         </div>
       ) : (
         <div className="ts-list">
-          {stats.map((s) => (
-            <div key={s.tag} className="ts-item">
+          {stats.map((stat) => (
+            <div key={stat.tag} className="ts-item">
               <div className="ts-item-row">
                 <span
                   className="ts-dot"
-                  style={{ backgroundColor: s.color }}
+                  style={{ backgroundColor: stat.color }}
                 />
-                <span className="ts-tag">{s.tag}</span>
+                <span className="ts-tag">{stat.tag}</span>
                 <span className="ts-time">
-                  {formatDuration(s.totalMs)}
-                  <span className="ts-pct"> · {s.percentageLabel}</span>
+                  {formatDuration(stat.totalMs)}
+                  <span className="ts-pct"> · {stat.percentageLabel}</span>
                 </span>
               </div>
               <div className="ts-bar-bg">
                 <div
                   className="ts-bar-fill"
-                  style={{ width: `${s.barWidth}%`, backgroundColor: s.color }}
+                  style={{ width: `${stat.barWidth}%`, backgroundColor: stat.color }}
                 />
               </div>
             </div>

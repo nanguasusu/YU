@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { loadTagStore, saveTagStore, addDurationToTag } from '../lib/tag-storage';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { loadTagStore, saveTagStore, updateTagRecordDuration } from '../lib/tag-storage';
 import { ACTIVITY_TAG_OPTIONS } from '../types';
 import type { CustomTag, TagStoreData } from '../types';
 
@@ -14,7 +14,6 @@ export function useTagStore() {
   });
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // 初始化加载
   useEffect(() => {
     const load = async () => {
       const data = await loadTagStore();
@@ -24,30 +23,45 @@ export function useTagStore() {
     void load();
   }, []);
 
-  // 创建自定义标签
+  const customTagNames = useMemo(
+    () => new Set(tagStore.customTags.map((tag) => tag.name)),
+    [tagStore.customTags],
+  );
+
+  const allExistingNames = useMemo(
+    () => new Set([...ACTIVITY_TAG_OPTIONS, ...tagStore.customTags.map((tag) => tag.name)]),
+    [tagStore.customTags],
+  );
+
+  const tagDurationMap = useMemo(
+    () => new Map(tagStore.tagRecords.map((record) => [record.tagName, record.totalMs] as const)),
+    [tagStore.tagRecords],
+  );
+
+  const sortedCustomTags = useMemo(
+    () => [...tagStore.customTags].sort((a, b) => b.lastUsedAt - a.lastUsedAt),
+    [tagStore.customTags],
+  );
+
   const createTag = useCallback(
     async (name: string): Promise<{ success: boolean; error?: string }> => {
       const trimmed = name.trim().slice(0, MAX_TAG_NAME_LENGTH);
       if (!trimmed) return { success: false, error: 'empty' };
 
-      // 检查是否与预设标签或已有自定义标签重复（区分大小写）
-      const allExisting = [
-        ...ACTIVITY_TAG_OPTIONS,
-        ...tagStore.customTags.map((t) => t.name),
-      ];
-      if (allExisting.includes(trimmed)) {
-        return { success: true }; // 直接选中已有标签
+      if (allExistingNames.has(trimmed)) {
+        return { success: true };
       }
 
       if (tagStore.customTags.length >= MAX_CUSTOM_TAGS) {
         return { success: false, error: 'limit_reached' };
       }
 
+      const now = Date.now();
       const newTag: CustomTag = {
-        id: Date.now(),
+        id: now,
         name: trimmed,
-        createdAt: Date.now(),
-        lastUsedAt: Date.now(),
+        createdAt: now,
+        lastUsedAt: now,
       };
 
       const updated: TagStoreData = {
@@ -63,15 +77,14 @@ export function useTagStore() {
         return { success: false, error: 'save_failed' };
       }
     },
-    [tagStore],
+    [allExistingNames, tagStore],
   );
 
-  // 删除自定义标签
   const deleteTag = useCallback(
     async (tagId: number): Promise<{ success: boolean; error?: string }> => {
       const updated: TagStoreData = {
         ...tagStore,
-        customTags: tagStore.customTags.filter((t) => t.id !== tagId),
+        customTags: tagStore.customTags.filter((tag) => tag.id !== tagId),
       };
 
       try {
@@ -85,58 +98,53 @@ export function useTagStore() {
     [tagStore],
   );
 
-  // 更新标签使用时间（排序用）
   const touchTag = useCallback(
     async (tagName: string) => {
+      if (!customTagNames.has(tagName)) return;
+
+      const touchedAt = Date.now();
       const updated: TagStoreData = {
         ...tagStore,
-        customTags: tagStore.customTags.map((t) =>
-          t.name === tagName ? { ...t, lastUsedAt: Date.now() } : t,
+        customTags: tagStore.customTags.map((tag) =>
+          tag.name === tagName ? { ...tag, lastUsedAt: touchedAt } : tag,
         ),
       };
       setTagStore(updated);
       await saveTagStore(updated);
     },
-    [tagStore],
+    [customTagNames, tagStore],
   );
 
-  // 记录计时时长
   const recordDuration = useCallback(
     async (
       tagName: string,
       durationMs: number,
     ): Promise<{ success: boolean; error?: string }> => {
-      if (durationMs < 1000) return { success: true }; // 不足1秒，丢弃
+      if (durationMs < 1000) return { success: true };
 
       try {
-        const updated = await addDurationToTag(tagName, durationMs);
+        const updated = updateTagRecordDuration(tagStore, tagName, durationMs);
         setTagStore(updated);
+        await saveTagStore(updated);
         return { success: true };
       } catch {
         return { success: false, error: 'record_failed' };
       }
     },
-    [],
+    [tagStore],
   );
 
-  // 获取标签累计时长
   const getTagDuration = useCallback(
-    (tagName: string): number => {
-      const record = tagStore.tagRecords.find((r) => r.tagName === tagName);
-      return record?.totalMs ?? 0;
-    },
-    [tagStore.tagRecords],
+    (tagName: string): number => tagDurationMap.get(tagName) ?? 0,
+    [tagDurationMap],
   );
 
-  // 获取排序后的可见自定义标签（按 lastUsedAt 降序取前 10）
-  const visibleCustomTags = [...tagStore.customTags]
-    .sort((a, b) => b.lastUsedAt - a.lastUsedAt)
-    .slice(0, VISIBLE_CUSTOM_TAGS);
-
-  const hasMoreTags = tagStore.customTags.length > VISIBLE_CUSTOM_TAGS;
-  const allCustomTags = [...tagStore.customTags].sort(
-    (a, b) => b.lastUsedAt - a.lastUsedAt,
+  const visibleCustomTags = useMemo(
+    () => sortedCustomTags.slice(0, VISIBLE_CUSTOM_TAGS),
+    [sortedCustomTags],
   );
+  const hasMoreTags = sortedCustomTags.length > VISIBLE_CUSTOM_TAGS;
+  const allCustomTags = sortedCustomTags;
   const isAtLimit = tagStore.customTags.length >= MAX_CUSTOM_TAGS;
 
   return {

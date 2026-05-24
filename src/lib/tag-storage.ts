@@ -10,7 +10,6 @@ const getDefaultTagStore = (): TagStoreData => ({
   tagRecords: [],
 });
 
-/** 加载标签存储 */
 export const loadTagStore = async (): Promise<TagStoreData> => {
   if (!isTauriStoreAvailable()) {
     try {
@@ -29,12 +28,13 @@ export const loadTagStore = async (): Promise<TagStoreData> => {
   }
 };
 
-/** 保存标签存储 */
 export const saveTagStore = async (data: TagStoreData): Promise<void> => {
   if (!isTauriStoreAvailable()) {
     try {
       window.localStorage.setItem(TAG_STORE_KEY, JSON.stringify(data));
-    } catch { /* ignore browser storage failures */ }
+    } catch {
+      // ignore browser storage failures
+    }
     return;
   }
 
@@ -42,25 +42,38 @@ export const saveTagStore = async (data: TagStoreData): Promise<void> => {
   await appStateStore.save();
 };
 
-/** 添加计时记录到指定标签 */
-export const addDurationToTag = async (
+export const updateTagRecordDuration = (
+  data: TagStoreData,
   tagName: string,
   durationMs: number,
-): Promise<TagStoreData> => {
-  const store = await loadTagStore();
-  const existingRecord = store.tagRecords.find((r) => r.tagName === tagName);
+): TagStoreData => {
+  const recordedAt = Date.now();
+  const recordIndex = data.tagRecords.findIndex((record) => record.tagName === tagName);
 
-  if (existingRecord) {
-    existingRecord.totalMs += durationMs;
-    existingRecord.lastRecordedAt = Date.now();
-  } else {
-    store.tagRecords.push({
-      tagName,
-      totalMs: durationMs,
-      lastRecordedAt: Date.now(),
-    });
+  if (recordIndex === -1) {
+    return {
+      ...data,
+      tagRecords: [
+        ...data.tagRecords,
+        {
+          tagName,
+          totalMs: durationMs,
+          lastRecordedAt: recordedAt,
+        },
+      ],
+    };
   }
 
-  await saveTagStore(store);
-  return store;
+  const nextRecords = [...data.tagRecords];
+  const currentRecord = nextRecords[recordIndex];
+  nextRecords[recordIndex] = {
+    ...currentRecord,
+    totalMs: currentRecord.totalMs + durationMs,
+    lastRecordedAt: recordedAt,
+  };
+
+  return {
+    ...data,
+    tagRecords: nextRecords,
+  };
 };

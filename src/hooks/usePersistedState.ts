@@ -1,8 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { appStateStore, loadPersistedState, mergePersistedState } from '../lib/storage';
+import {
+  appStateStore,
+  invalidatePersistedStateCache,
+  loadPersistedState,
+  PERSISTED_STATE_KEYS,
+  savePersistedStatePatch,
+} from '../lib/storage';
 import { buildDateFromInput, formatDateInput, PROGRESS_COLORS, DEFAULT_STATE, DEFAULT_TIMER_LABELS } from '../types';
-import { STORAGE_KEY } from '../types';
 import type { CountdownStyle, MiniTimerFont, TaskItem, ProgressItem, PersistedState, TimerStatus } from '../types';
 
 type UsePersistedStateOptions = {
@@ -33,7 +38,7 @@ export function usePersistedState(options: UsePersistedStateOptions = {}) {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const persistSettingsPatch = (patch: Partial<PersistedState>) => {
     if (!isHydrated) return;
-    void mergePersistedState(patch);
+    void savePersistedStatePatch(patch);
   };
   const applyPersistedState = (persisted: PersistedState) => {
     setTargetTitle(persisted.targetTitle);
@@ -70,10 +75,16 @@ export function usePersistedState(options: UsePersistedStateOptions = {}) {
 
     const setup = async () => {
       try {
-        unlisten = await appStateStore.onKeyChange(STORAGE_KEY, async () => {
-          const persisted = await loadPersistedState();
-          applyPersistedState(persisted);
-        });
+        const unlistenCallbacks = await Promise.all(
+          PERSISTED_STATE_KEYS.map((key) => appStateStore.onKeyChange(key, async () => {
+            invalidatePersistedStateCache();
+            const persisted = await loadPersistedState();
+            applyPersistedState(persisted);
+          })),
+        );
+        unlisten = () => {
+          unlistenCallbacks.forEach((callback) => callback());
+        };
       } catch {
         // ignore store events outside Tauri
       }
@@ -105,7 +116,7 @@ export function usePersistedState(options: UsePersistedStateOptions = {}) {
 
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
-      void mergePersistedState({
+      void savePersistedStatePatch({
         targetTitle,
         targetDate: formatDateInput(targetDate),
         widgetWidth,
@@ -124,13 +135,10 @@ export function usePersistedState(options: UsePersistedStateOptions = {}) {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     };
   }, [
-    accentColor,
     activityTag,
-    countdownStyle,
     miniTimerFont,
     elapsedMs,
     isHydrated,
-    isMuted,
     lastStartedAt,
     progressItems,
     targetDate,
@@ -138,8 +146,8 @@ export function usePersistedState(options: UsePersistedStateOptions = {}) {
     tasks,
     timerLabels,
     timerStatus,
-    widgetOpacity,
     widgetWidth,
+    persistMode,
   ]);
 
   // Listen to Tauri window resize and persist the new width

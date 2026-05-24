@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { TimerRecord, formatTimeRange, formatDuration } from '../types';
 import { buildTagColorMapFromRecords } from '../lib/tag-colors';
@@ -7,7 +7,6 @@ interface TimerTimelinePageProps {
   key?: React.Key;
   records: TimerRecord[];
   accentColor: string;
-  /** The tag currently being timed, so it always gets the accent color */
   activeTag?: string;
 }
 
@@ -16,16 +15,18 @@ export default function TimerTimelinePage({
   accentColor,
   activeTag,
 }: TimerTimelinePageProps) {
-  const sorted = [...records].sort((a, b) => b.startTime - a.startTime);
+  const sorted = useMemo(
+    () => [...records].sort((a, b) => b.startTime - a.startTime),
+    [records],
+  );
+  const colorMap = useMemo(
+    () => buildTagColorMapFromRecords(records, accentColor, activeTag),
+    [records, accentColor, activeTag],
+  );
 
-  // Build a stable tag → color map shared across all items in this render
-  const colorMap = buildTagColorMapFromRecords(records, accentColor, activeTag);
-
-  // ── Custom scrollbar state ──────────────────────────────────────────────
   const scrollRef = useRef<HTMLDivElement>(null);
   const fadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // thumbTop: 0–1 (fraction of track), thumbHeight: 0–1 (fraction of track)
   const [thumb, setThumb] = useState({ top: 0, height: 1 });
   const [visible, setVisible] = useState(false);
   const [canScrollUp, setCanScrollUp] = useState(false);
@@ -34,6 +35,7 @@ export default function TimerTimelinePage({
   const updateScrollbar = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
+
     const { scrollTop, scrollHeight, clientHeight } = el;
     const scrollable = scrollHeight > clientHeight;
     if (!scrollable) {
@@ -42,9 +44,10 @@ export default function TimerTimelinePage({
       setCanScrollDown(false);
       return;
     }
-    const thumbH = Math.max(clientHeight / scrollHeight, 0.08); // min 8% height
-    const thumbT = (scrollTop / (scrollHeight - clientHeight)) * (1 - thumbH);
-    setThumb({ top: thumbT, height: thumbH });
+
+    const thumbHeight = Math.max(clientHeight / scrollHeight, 0.08);
+    const thumbTop = (scrollTop / (scrollHeight - clientHeight)) * (1 - thumbHeight);
+    setThumb({ top: thumbTop, height: thumbHeight });
     setCanScrollUp(scrollTop > 2);
     setCanScrollDown(scrollTop < scrollHeight - clientHeight - 2);
   }, []);
@@ -60,24 +63,20 @@ export default function TimerTimelinePage({
     showScrollbar();
   }, [updateScrollbar, showScrollbar]);
 
-  // Recalculate on records change or resize
   useEffect(() => {
     updateScrollbar();
-  }, [records, updateScrollbar]);
+  }, [sorted, updateScrollbar]);
 
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => updateScrollbar());
-    ro.observe(el);
-    return () => ro.disconnect();
+    const observer = new ResizeObserver(() => updateScrollbar());
+    observer.observe(el);
+    return () => observer.disconnect();
   }, [updateScrollbar]);
 
-  // Cleanup fade timer on unmount
-  useEffect(() => {
-    return () => {
-      if (fadeTimerRef.current) clearTimeout(fadeTimerRef.current);
-    };
+  useEffect(() => () => {
+    if (fadeTimerRef.current) clearTimeout(fadeTimerRef.current);
   }, []);
 
   const handleMouseEnter = useCallback(() => {
@@ -98,7 +97,6 @@ export default function TimerTimelinePage({
       exit={{ opacity: 0, x: -15, transition: { duration: 0.15 } }}
       transition={{ duration: 0.3, ease: 'easeOut' }}
     >
-      {/* Header */}
       <div className="tl-header">
         <span className="tl-title">今日时间线</span>
         {records.length > 0 && (
@@ -106,20 +104,17 @@ export default function TimerTimelinePage({
         )}
       </div>
 
-      {/* Scrollable list + custom scrollbar wrapper */}
       <div
         className="tl-scroll-wrap"
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
-        {/* Top fade mask — visible when content above */}
         <div
           className="tl-fade-top"
           style={{ opacity: canScrollUp ? 1 : 0 }}
           aria-hidden="true"
         />
 
-        {/* Scrollable content */}
         <div
           ref={scrollRef}
           className="tl-scroll"
@@ -132,7 +127,6 @@ export default function TimerTimelinePage({
           ) : (
             <div className="tl-list">
               {sorted.map((record, index) => {
-                // Don't show tag sub-label when it's identical to the title
                 const showTag = record.tag && record.tag !== record.title;
                 const isLast = index === sorted.length - 1;
                 const tagKey = record.tag ?? '未分类';
@@ -140,7 +134,6 @@ export default function TimerTimelinePage({
 
                 return (
                   <div key={record.id} className="tl-item">
-                    {/* Left spine: dot + connector line */}
                     <div className="tl-spine">
                       <span
                         className="tl-dot"
@@ -149,7 +142,6 @@ export default function TimerTimelinePage({
                       {!isLast && <span className="tl-line" />}
                     </div>
 
-                    {/* Content */}
                     <div className="tl-content">
                       <div className="tl-meta">
                         <span className="tl-time-range">
@@ -171,14 +163,12 @@ export default function TimerTimelinePage({
           )}
         </div>
 
-        {/* Bottom fade mask — visible when content below */}
         <div
           className="tl-fade-bottom"
           style={{ opacity: canScrollDown ? 1 : 0 }}
           aria-hidden="true"
         />
 
-        {/* Custom scrollbar track + thumb */}
         <div className="tl-scrollbar-track" aria-hidden="true">
           <div
             className="tl-scrollbar-thumb"
