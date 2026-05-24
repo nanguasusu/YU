@@ -74,8 +74,8 @@ export default function SettingsWindow() {
             setIsMuted={state.setIsMuted}
             widgetOpacity={state.widgetOpacity}
             setWidgetOpacity={state.setWidgetOpacity}
-            countdownStyle={state.countdownStyle}
-            setCountdownStyle={state.setCountdownStyle}
+            miniTimerFont={state.miniTimerFont}
+            setMiniTimerFont={state.setMiniTimerFont}
             accentColor={state.accentColor}
             setAccentColor={state.setAccentColor}
             autostart={state.autostart}

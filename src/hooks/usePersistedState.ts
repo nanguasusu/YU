@@ -3,7 +3,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { appStateStore, loadPersistedState, mergePersistedState } from '../lib/storage';
 import { buildDateFromInput, formatDateInput, PROGRESS_COLORS, DEFAULT_STATE, DEFAULT_TIMER_LABELS } from '../types';
 import { STORAGE_KEY } from '../types';
-import type { CountdownStyle, TaskItem, ProgressItem, PersistedState, TimerStatus } from '../types';
+import type { CountdownStyle, MiniTimerFont, TaskItem, ProgressItem, PersistedState, TimerStatus } from '../types';
 
 type UsePersistedStateOptions = {
   trackWindowWidth?: boolean;
@@ -15,6 +15,7 @@ export function usePersistedState(options: UsePersistedStateOptions = {}) {
   const [targetTitle, setTargetTitle] = useState(DEFAULT_STATE.targetTitle);
   const [targetDate, setTargetDate] = useState(buildDateFromInput(DEFAULT_STATE.targetDate));
   const [countdownStyle, setCountdownStyle] = useState<CountdownStyle>(DEFAULT_STATE.countdownStyle);
+  const [miniTimerFont, setMiniTimerFontState] = useState<MiniTimerFont>(DEFAULT_STATE.miniTimerFont);
   const [widgetOpacity, setWidgetOpacity] = useState(DEFAULT_STATE.opacity);
   const [widgetWidth, setWidgetWidth] = useState(DEFAULT_STATE.widgetWidth);
   const [tasks, setTasks] = useState<TaskItem[]>(DEFAULT_STATE.tasks);
@@ -38,6 +39,7 @@ export function usePersistedState(options: UsePersistedStateOptions = {}) {
     setTargetTitle(persisted.targetTitle);
     setTargetDate(buildDateFromInput(persisted.targetDate));
     setCountdownStyle(persisted.countdownStyle);
+    setMiniTimerFontState(persisted.miniTimerFont ?? 'mono');
     setWidgetOpacity(persisted.opacity);
     setWidgetWidth(persisted.widgetWidth);
     setTasks(persisted.tasks);
@@ -114,6 +116,7 @@ export function usePersistedState(options: UsePersistedStateOptions = {}) {
         elapsedMs,
         lastStartedAt,
         timerLabels,
+        miniTimerFont,
       });
     }, 500);
 
@@ -124,6 +127,7 @@ export function usePersistedState(options: UsePersistedStateOptions = {}) {
     accentColor,
     activityTag,
     countdownStyle,
+    miniTimerFont,
     elapsedMs,
     isHydrated,
     isMuted,
@@ -268,6 +272,11 @@ export function usePersistedState(options: UsePersistedStateOptions = {}) {
     if (persistMode === 'settings') persistSettingsPatch({ countdownStyle: style });
   };
 
+  const updateMiniTimerFont = (font: MiniTimerFont) => {
+    setMiniTimerFontState(font);
+    if (persistMode === 'settings') persistSettingsPatch({ miniTimerFont: font });
+  };
+
   const updateAccentColor = (color: string) => {
     setAccentColor(color);
     if (persistMode === 'settings') persistSettingsPatch({ accentColor: color });
@@ -324,6 +333,7 @@ export function usePersistedState(options: UsePersistedStateOptions = {}) {
     targetTitle, setTargetTitle,
     targetDate, setTargetDate,
     countdownStyle, setCountdownStyle: updateCountdownStyle,
+    miniTimerFont, setMiniTimerFont: updateMiniTimerFont,
     widgetOpacity, setWidgetOpacity: updateWidgetOpacity,
     widgetWidth,
     tasks,

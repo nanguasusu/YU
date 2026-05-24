@@ -20,6 +20,7 @@ export const getDefaultTargetDate = (): string => {
 };
 
 export type CountdownStyle = 'sans' | 'serif' | 'mono';
+export type MiniTimerFont = 'mono' | 'rounded' | 'thin' | 'digital' | 'serif' | 'sans';
 export type ActiveTab = 'timer' | 'tasks' | 'stats';
 export type SoundType = 'click' | 'complete' | 'minimize' | 'unminimize' | 'pop';
 export type TimerStatus = 'idle' | 'running' | 'paused';
@@ -43,6 +44,7 @@ export type PersistedState = {
   targetTitle: string;
   targetDate: string;
   countdownStyle: CountdownStyle;
+  miniTimerFont: MiniTimerFont;
   muted: boolean;
   opacity: number;
   widgetWidth: number;
@@ -73,6 +75,7 @@ export const DEFAULT_STATE: PersistedState = {
   targetTitle: DEFAULT_TARGET_TITLE,
   get targetDate() { return getDefaultTargetDate(); },
   countdownStyle: 'sans',
+  miniTimerFont: 'mono',
   muted: false,
   opacity: DEFAULT_OPACITY,
   widgetWidth: 320,

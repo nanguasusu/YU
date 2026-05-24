@@ -7,6 +7,7 @@ interface TagPickerProps {
   onSelectTag: (tag: string) => void;
   accentColor: string;
   labels: string[];
+  disabled?: boolean;
 }
 
 /** Truncate tag name: >6 chars → first 6 + "…" */
@@ -20,6 +21,7 @@ export const TagPicker: React.FC<TagPickerProps> = ({
   onSelectTag,
   accentColor,
   labels,
+  disabled = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -53,8 +55,9 @@ export const TagPicker: React.FC<TagPickerProps> = ({
 
   const handleToggle = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
+    if (disabled) return;
     setIsOpen((prev) => !prev);
-  }, []);
+  }, [disabled]);
 
   const handleSelect = useCallback((tag: string) => {
     onSelectTag(tag);
@@ -66,19 +69,22 @@ export const TagPicker: React.FC<TagPickerProps> = ({
       <button
         ref={triggerRef}
         type="button"
-        className="tag-picker-trigger"
+        className={`tag-picker-trigger${disabled ? ' tag-picker-trigger-disabled' : ''}`}
         onClick={handleToggle}
         onMouseDown={(e) => e.stopPropagation()}
         aria-label="选择标签"
         aria-expanded={isOpen}
+        disabled={disabled}
       >
         <span className="tag-picker-value">
           {currentTag ? truncateTagName(currentTag) : '请选择标签'}
         </span>
-        <ChevronDown
-          className={`tag-picker-chevron ${isOpen ? 'tag-picker-chevron-open' : ''}`}
-          strokeWidth={2}
-        />
+        {!disabled && (
+          <ChevronDown
+            className={`tag-picker-chevron ${isOpen ? 'tag-picker-chevron-open' : ''}`}
+            strokeWidth={2}
+          />
+        )}
       </button>
 
       <AnimatePresence>

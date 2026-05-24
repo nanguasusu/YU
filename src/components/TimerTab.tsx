@@ -3,7 +3,7 @@ import type React from 'react';
 import { Clock } from 'lucide-react';
 import { motion } from 'motion/react';
 import { buildDateFromInput, formatDateInput, DEFAULT_TARGET_TITLE } from '../types';
-import type { CountdownStyle } from '../types';
+import type { MiniTimerFont } from '../types';
 
 interface TimerTabProps {
   key?: React.Key;
@@ -11,7 +11,7 @@ interface TimerTabProps {
   setTargetTitle: (title: string) => void;
   targetDate: Date;
   setTargetDate: (date: Date) => void;
-  countdownStyle: CountdownStyle;
+  miniTimerFont: MiniTimerFont;
   accentColor: string;
 }
 
@@ -20,7 +20,7 @@ export function TimerTab({
   setTargetTitle,
   targetDate,
   setTargetDate,
-  countdownStyle,
+  miniTimerFont,
   accentColor,
 }: TimerTabProps) {
   const [isEditingTargetTitle, setIsEditingTargetTitle] = useState(false);
@@ -141,9 +141,9 @@ export function TimerTab({
       </div>
 
       <div className="timer-content">
-        <div className={`timer-container timer-font-${countdownStyle}`}>
+        <div className="timer-container">
           <span
-            className={`timer-number timer-number-${countdownStyle}`}
+            className={`timer-number mini-time-font-${miniTimerFont}`}
             style={{ color: accentColor }}
           >
             {daysLeft}

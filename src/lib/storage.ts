@@ -59,6 +59,7 @@ const normalizeState = (parsed: LegacyPersistedState): PersistedState => {
     targetTitle: parsed.targetTitle?.trim() || defaults.targetTitle,
     targetDate: parsed.targetDate || defaults.targetDate,
     countdownStyle: parsed.countdownStyle || defaults.countdownStyle,
+    miniTimerFont: parsed.miniTimerFont ?? defaults.miniTimerFont,
     muted: parsed.muted ?? parsed.notifications ?? defaults.muted,
     opacity: Math.min(100, Math.max(20, Number(parsed.opacity) || DEFAULT_OPACITY)),
     widgetWidth: Math.min(480, Math.max(260, Number(parsed.widgetWidth) || defaults.widgetWidth)),

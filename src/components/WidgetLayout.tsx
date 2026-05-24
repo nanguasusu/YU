@@ -48,7 +48,7 @@ export function WidgetLayout({
               setTargetTitle={state.setTargetTitle}
               targetDate={state.targetDate}
               setTargetDate={state.setTargetDate}
-              countdownStyle={state.countdownStyle}
+              miniTimerFont={state.miniTimerFont}
               accentColor={accentColor}
             />
           )}

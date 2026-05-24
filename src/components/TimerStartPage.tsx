@@ -81,7 +81,10 @@ export const TimerStartPage: React.FC<TimerStartPageProps> = ({
 
       {/* ── Central time display — no card, just the number ── */}
       <div className="tsp-time-block">
-        <span className="tsp-time" style={{ color: accentColor }}>
+        <span
+          className={`tsp-time mini-time-font-${state.miniTimerFont}`}
+          style={{ color: accentColor }}
+        >
           {formatElapsedTime(liveElapsedMs)}
         </span>
         <span className="tsp-status">

@@ -44,19 +44,17 @@ function MiniTimer({
   activityTag,
   timerStatus,
   displayTime,
-  onToggle,
-  onReset,
   onSelectTag,
   timerLabels,
+  miniTimerFont,
 }: {
   accentColor: string;
   activityTag: string;
   timerStatus: TimerStatus;
   displayTime: string;
-  onToggle: () => void;
-  onReset: () => void;
   onSelectTag: (tag: string) => void;
   timerLabels: string[];
+  miniTimerFont: string;
 }) {
   const statusText = getStatusText(activityTag, timerStatus);
 
@@ -68,26 +66,21 @@ function MiniTimer({
           onSelectTag={onSelectTag}
           accentColor={accentColor}
           labels={timerLabels}
+          disabled
         />
         {activityTag.trim() && (
           <span className="mini-timer-status">{statusText}</span>
         )}
       </div>
 
-      <button
-        type="button"
-        className="mini-timer-display"
-        onClick={onToggle}
-        onDoubleClick={onReset}
-        onMouseDown={(e) => e.stopPropagation()}
-        title={activityTag.trim() ? '单击暂停/继续，双击重置' : '请先选择标签'}
-        aria-label={activityTag.trim() ? `${statusText}，当前时间 ${displayTime}` : statusText}
-      >
-        <span className="mini-info-text mini-time-text" style={{ color: accentColor }}>
+      <div className="mini-timer-display">
+        <span
+          className={`mini-info-text mini-time-text mini-time-font-${miniTimerFont}`}
+          style={{ color: accentColor }}
+        >
           {displayTime}
         </span>
-        <span className="mini-timer-hint">单击暂停，双击重置</span>
-      </button>
+      </div>
     </div>
   );
 }
@@ -243,10 +236,9 @@ export default function App() {
                   activityTag={state.activityTag}
                   timerStatus={state.timerStatus}
                   displayTime={timerDisplay}
-                  onToggle={handleToggle}
-                  onReset={handleReset}
                   onSelectTag={handleSelectTag}
                   timerLabels={mergedLabels}
+                  miniTimerFont={state.miniTimerFont}
                 />
               </div>
             </div>
@@ -297,6 +289,7 @@ export default function App() {
             <div className="brand-icon-wrap">
               <BrandClockIcon
                 accentColor={state.accentColor}
+                variant={appMode === 'widget' ? 'widget' : 'timer'}
                 onClick={(e) => {
                   e.stopPropagation();
                   setModeMenuOpen((prev) => !prev);
@@ -323,15 +316,17 @@ export default function App() {
             </div>
           </div>
           <div className="top-actions">
-            <button
-              type="button"
-              className="icon-button"
-              onClick={(e) => { e.stopPropagation(); handleMinimize(); }}
-              onMouseDown={(e) => e.stopPropagation()}
-              aria-label="最小化组件"
-            >
-              <Minimize2 className="action-icon" strokeWidth={2} />
-            </button>
+            {appMode === 'timer' && (
+              <button
+                type="button"
+                className="icon-button"
+                onClick={(e) => { e.stopPropagation(); handleMinimize(); }}
+                onMouseDown={(e) => e.stopPropagation()}
+                aria-label="最小化组件"
+              >
+                <Minimize2 className="action-icon" strokeWidth={2} />
+              </button>
+            )}
           </div>
         </div>
 

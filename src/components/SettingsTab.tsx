@@ -1,15 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Volume2, Power, ChevronRight, ChevronLeft, Plus, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import type { CountdownStyle } from '../types';
+import type { MiniTimerFont } from '../types';
 
 interface SettingsTabProps {
   isMuted: boolean;
   setIsMuted: (muted: boolean) => void;
   widgetOpacity: number;
   setWidgetOpacity: (opacity: number) => void;
-  countdownStyle: CountdownStyle;
-  setCountdownStyle: (style: CountdownStyle) => void;
+  miniTimerFont: MiniTimerFont;
+  setMiniTimerFont: (font: MiniTimerFont) => void;
   accentColor: string;
   setAccentColor: (color: string) => void;
   autostart: boolean;
@@ -19,10 +19,13 @@ interface SettingsTabProps {
   onSound: (type: 'click') => void;
 }
 
-const STYLE_OPTIONS: { value: CountdownStyle; label: string }[] = [
-  { value: 'sans', label: '无衬线' },
-  { value: 'serif', label: 'Playfair' },
-  { value: 'mono', label: 'Special' },
+const MINI_FONT_OPTIONS: { value: MiniTimerFont; label: string; preview: string }[] = [
+  { value: 'mono',    label: '等宽',   preview: '00:00' },
+  { value: 'digital', label: '数码',   preview: '00:00' },
+  { value: 'rounded', label: '圆润',   preview: '00:00' },
+  { value: 'thin',    label: '纤细',   preview: '00:00' },
+  { value: 'serif',   label: '衬线',   preview: '00:00' },
+  { value: 'sans',    label: '黑体',   preview: '00:00' },
 ];
 
 const MAX_LABEL_LENGTH = 10;
@@ -158,8 +161,8 @@ export function SettingsTab({
   setIsMuted,
   widgetOpacity,
   setWidgetOpacity,
-  countdownStyle,
-  setCountdownStyle,
+  miniTimerFont,
+  setMiniTimerFont,
   accentColor,
   setAccentColor,
   autostart,
@@ -245,23 +248,6 @@ export function SettingsTab({
                 </div>
               </div>
 
-              {/* 数字字体 */}
-              <div className="settings-item-col">
-                <span className="settings-mini-label">倒计时字体</span>
-                <div className="style-segmented">
-                  {STYLE_OPTIONS.map(({ value, label }) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => { onSound('click'); setCountdownStyle(value); }}
-                      className={`style-chip ${countdownStyle === value ? 'style-chip-active' : 'style-chip-inactive'}`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
               {/* 全局色彩 */}
               <div className="settings-item">
                 <div className="settings-label" style={{ marginBottom: 0 }}>
@@ -286,6 +272,27 @@ export function SettingsTab({
               <div className="settings-section-divider" />
 
               <div className="settings-section-label">计时器</div>
+
+              {/* 迷你计时器字体 */}
+              <div className="settings-item-col">
+                <span className="settings-mini-label">迷你时钟字体</span>
+                <div className="mini-font-grid">
+                  {MINI_FONT_OPTIONS.map(({ value, label }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => { onSound('click'); setMiniTimerFont(value); }}
+                      className={`mini-font-chip ${miniTimerFont === value ? 'mini-font-chip-active' : 'mini-font-chip-inactive'}`}
+                      style={miniTimerFont === value ? { borderColor: accentColor, color: accentColor } : undefined}
+                    >
+                      <span className={`mini-font-preview mini-time-font-${value}`}>
+                        12:34
+                      </span>
+                      <span className="mini-font-label">{label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               {/* 常用标签 nav row */}
               <button
