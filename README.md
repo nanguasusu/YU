@@ -1,5 +1,5 @@
-# 屿时钟
 
+<h1 style="font-size: 24px" align="center"> 屿时钟 </h1>
 <p align="center">
   <a href="./README_EN.md" style="text-decoration: none; padding: 4px 12px; border-radius: 6px; background-color: #f0f0f0; color: #555; font-size: 14px;">English</a>
   &nbsp;
